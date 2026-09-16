@@ -38,19 +38,21 @@ impl ChannelState {
     pub fn init() -> Self {
         let channel = Channel::Oss;
         let app_id = AppId::new("dev", "warp", "WarpOss");
+        let mut config = ChannelConfig {
+            app_id,
+            logfile_name: "".into(),
+            server_config: WarpServerConfig::production(),
+            oz_config: OzConfig::production(),
+            telemetry_config: None,
+            autoupdate_config: None,
+            crash_reporting_config: None,
+            mcp_static_config: None,
+        };
+        disable_production_network_if_local_offline(&mut config);
         Self {
             channel,
             additional_features: Default::default(),
-            config: ChannelConfig {
-                app_id,
-                logfile_name: "".into(),
-                server_config: WarpServerConfig::production(),
-                oz_config: OzConfig::production(),
-                telemetry_config: None,
-                autoupdate_config: None,
-                crash_reporting_config: None,
-                mcp_static_config: None,
-            },
+            config,
         }
     }
 
@@ -58,6 +60,7 @@ impl ChannelState {
         if let Some(app_id) = app_id_from_bundle() {
             config.app_id = app_id;
         }
+        disable_production_network_if_local_offline(&mut config);
         Self {
             channel,
             additional_features: Default::default(),
@@ -186,7 +189,7 @@ impl ChannelState {
     /// `telemetry_config: None`, in which case UI that controls telemetry
     /// should be hidden since the toggle has no effect.
     pub fn is_telemetry_available() -> bool {
-        CHANNEL_STATE.lock().config.telemetry_config.is_some()
+        !production_endpoints_disabled() && CHANNEL_STATE.lock().config.telemetry_config.is_some()
     }
 
     /// Returns whether this build has a crash reporting config and can therefore
@@ -194,10 +197,14 @@ impl ChannelState {
     /// `crash_reporting_config: None`, in which case UI that controls crash
     /// reporting should be hidden since the toggle has no effect.
     pub fn is_crash_reporting_available() -> bool {
-        CHANNEL_STATE.lock().config.crash_reporting_config.is_some()
+        !production_endpoints_disabled()
+            && CHANNEL_STATE.lock().config.crash_reporting_config.is_some()
     }
 
     pub fn releases_base_url() -> Cow<'static, str> {
+        if production_endpoints_disabled() {
+            return Cow::Borrowed("");
+        }
         CHANNEL_STATE
             .lock()
             .config
@@ -208,6 +215,9 @@ impl ChannelState {
     }
 
     pub fn firebase_api_key() -> Cow<'static, str> {
+        if production_endpoints_disabled() {
+            return Cow::Borrowed("");
+        }
         CHANNEL_STATE
             .lock()
             .config
@@ -217,6 +227,9 @@ impl ChannelState {
     }
 
     pub fn ws_server_url() -> Cow<'static, str> {
+        if production_endpoints_disabled() {
+            return Cow::Borrowed(crate::local_offline::DEAD_END_WS_URL);
+        }
         CHANNEL_STATE
             .lock()
             .config
@@ -251,12 +264,19 @@ impl ChannelState {
             if #[cfg(feature = "test-util")] {
                 Some(Cow::Borrowed("fake_session_sharing_url"))
             } else {
-                CHANNEL_STATE.lock().config.server_config.session_sharing_server_url.clone()
+                if production_endpoints_disabled() {
+                    None
+                } else {
+                    CHANNEL_STATE.lock().config.server_config.session_sharing_server_url.clone()
+                }
             }
         }
     }
 
     pub fn oz_root_url() -> Cow<'static, str> {
+        if production_endpoints_disabled() {
+            return Cow::Borrowed(crate::local_offline::DEAD_END_HTTP_ROOT);
+        }
         CHANNEL_STATE.lock().config.oz_config.oz_root_url.clone()
     }
 
@@ -265,7 +285,11 @@ impl ChannelState {
             if #[cfg(feature = "test-util")] {
                 Cow::Owned(MOCK_SERVER_URL.clone())
             } else {
-                CHANNEL_STATE.lock().config.server_config.server_root_url.clone()
+                if production_endpoints_disabled() {
+                    Cow::Borrowed(crate::local_offline::DEAD_END_HTTP_ROOT)
+                } else {
+                    CHANNEL_STATE.lock().config.server_config.server_root_url.clone()
+                }
             }
         }
     }
@@ -290,6 +314,9 @@ impl ChannelState {
 
     /// Returns the rudderstack destination for all events that don't contain user-generated content.
     pub fn rudderstack_non_ugc_destination() -> RudderStackDestination {
+        if production_endpoints_disabled() {
+            return RudderStackDestination::default();
+        }
         let state = CHANNEL_STATE.lock();
 
         state
@@ -303,6 +330,9 @@ impl ChannelState {
 
     /// Returns the rudderstack destination for all events that contain user-generated content.
     pub fn rudderstack_ugc_destination() -> RudderStackDestination {
+        if production_endpoints_disabled() {
+            return RudderStackDestination::default();
+        }
         let state = CHANNEL_STATE.lock();
 
         state
@@ -336,6 +366,9 @@ impl ChannelState {
     }
 
     pub fn sentry_url() -> Cow<'static, str> {
+        if production_endpoints_disabled() {
+            return Cow::Borrowed("");
+        }
         CHANNEL_STATE
             .lock()
             .config
@@ -346,13 +379,26 @@ impl ChannelState {
     }
 
     pub fn show_autoupdate_menu_items() -> bool {
-        CHANNEL_STATE
-            .lock()
-            .config
-            .autoupdate_config
-            .as_ref()
-            .map(|ac| ac.show_autoupdate_menu_items)
-            .unwrap_or_default()
+        !production_endpoints_disabled()
+            && CHANNEL_STATE
+                .lock()
+                .config
+                .autoupdate_config
+                .as_ref()
+                .map(|ac| ac.show_autoupdate_menu_items)
+                .unwrap_or_default()
+    }
+
+    /// Distinguishable product name for window titles and About.
+    ///
+    /// Local-offline builds use [`crate::local_offline::PRODUCT_LABEL`] so the
+    /// fork is not mistaken for an official Warp release.
+    pub fn product_display_name() -> &'static str {
+        if crate::local_offline::is_compiled_or_env_enabled() {
+            crate::local_offline::PRODUCT_LABEL
+        } else {
+            "Warp"
+        }
     }
 
     /// Returns the MCP OAuth provider config matching the given client ID, if any.
@@ -413,6 +459,97 @@ fn derive_http_origin_from_ws_url(ws_url: &str) -> Option<String> {
 #[cfg(all(test, not(feature = "test-util")))]
 #[path = "state_tests.rs"]
 mod tests;
+
+/// True when this process must not contact Warp production endpoints.
+fn production_endpoints_disabled() -> bool {
+    crate::local_offline::is_compiled_or_env_enabled()
+}
+
+/// Point GraphQL / RTC / Oz / telemetry / Sentry / autoupdate at dead-ends or off.
+fn disable_production_network_if_local_offline(config: &mut ChannelConfig) {
+    if !production_endpoints_disabled() {
+        return;
+    }
+    disable_production_network(config);
+}
+
+/// Rewrite a channel config so leftover callers cannot reach Warp production.
+fn disable_production_network(config: &mut ChannelConfig) {
+    config.server_config = WarpServerConfig::disabled();
+    config.oz_config = OzConfig::disabled();
+    config.telemetry_config = None;
+    config.autoupdate_config = None;
+    config.crash_reporting_config = None;
+}
+
+#[cfg(test)]
+mod local_offline_network_tests {
+    use super::*;
+    use crate::channel::config::{AutoupdateConfig, CrashReportingConfig, TelemetryConfig};
+
+    #[test]
+    fn disable_production_network_clears_phone_home_config() {
+        let mut config = ChannelConfig {
+            app_id: AppId::new("dev", "warp", "WarpOss"),
+            logfile_name: "warp.log".into(),
+            server_config: WarpServerConfig::production(),
+            oz_config: OzConfig::production(),
+            telemetry_config: Some(TelemetryConfig {
+                telemetry_file_name: "events".into(),
+                rudderstack_config: None,
+            }),
+            autoupdate_config: Some(AutoupdateConfig {
+                releases_base_url: "https://releases.warp.dev".into(),
+                show_autoupdate_menu_items: true,
+            }),
+            crash_reporting_config: Some(CrashReportingConfig {
+                sentry_url: "https://example.ingest.sentry.io/1".into(),
+            }),
+            mcp_static_config: None,
+        };
+
+        disable_production_network(&mut config);
+
+        assert_eq!(
+            config.server_config.server_root_url.as_ref(),
+            crate::local_offline::DEAD_END_HTTP_ROOT
+        );
+        assert_eq!(
+            config.server_config.rtc_server_url.as_ref(),
+            crate::local_offline::DEAD_END_WS_URL
+        );
+        assert!(config.server_config.session_sharing_server_url.is_none());
+        assert!(config.server_config.firebase_auth_api_key.is_empty());
+        assert_eq!(
+            config.oz_config.oz_root_url.as_ref(),
+            crate::local_offline::DEAD_END_HTTP_ROOT
+        );
+        assert!(config.telemetry_config.is_none());
+        assert!(config.autoupdate_config.is_none());
+        assert!(config.crash_reporting_config.is_none());
+    }
+
+    #[test]
+    fn production_config_targets_warp_hosts() {
+        let server = WarpServerConfig::production();
+        assert!(server.server_root_url.contains("app.warp.dev"));
+        assert!(server.rtc_server_url.contains("rtc.app.warp.dev"));
+        let oz = OzConfig::production();
+        assert!(oz.oz_root_url.contains("oz.warp.dev"));
+    }
+
+    #[test]
+    fn product_display_name_is_official_unless_local_offline() {
+        if crate::local_offline::is_compiled_or_env_enabled() {
+            assert_eq!(
+                ChannelState::product_display_name(),
+                crate::local_offline::PRODUCT_LABEL
+            );
+        } else {
+            assert_eq!(ChannelState::product_display_name(), "Warp");
+        }
+    }
+}
 
 fn app_id_from_bundle() -> Option<AppId> {
     // On macOS, attempt to determine the app ID from the containing bundle,

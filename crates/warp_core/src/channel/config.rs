@@ -56,8 +56,8 @@ impl WarpServerConfig {
     /// hanging on or authenticating against production Warp infrastructure.
     pub fn disabled() -> Self {
         Self {
-            server_root_url: "http://127.0.0.1:0".into(),
-            rtc_server_url: "ws://127.0.0.1:0/graphql/v2".into(),
+            server_root_url: crate::local_offline::DEAD_END_HTTP_ROOT.into(),
+            rtc_server_url: crate::local_offline::DEAD_END_WS_URL.into(),
             session_sharing_server_url: None,
             firebase_auth_api_key: "".into(),
         }
@@ -86,7 +86,7 @@ impl OzConfig {
     /// Unreachable loopback endpoint for local-first builds without Oz.
     pub fn disabled() -> Self {
         Self {
-            oz_root_url: "http://127.0.0.1:0".into(),
+            oz_root_url: crate::local_offline::DEAD_END_HTTP_ROOT.into(),
             workload_audience_url: None,
         }
     }

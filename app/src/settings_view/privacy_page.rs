@@ -94,8 +94,7 @@ const TELEMETRY_DESCRIPTION: &str =
     certain console interactions to improve Warp's AI capabilities.";
 const TELEMETRY_FREE_TIER_NOTE: &str =
     "On the free tier, analytics must be enabled to use AI features.";
-const TELEMETRY_DOCS_URL: &str =
-    "https://docs.warp.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-warp-collect-and-why";
+const TELEMETRY_DOCS_URL: &str = "https://docs.warp.dev/support-and-community/privacy-and-security/privacy#what-telemetry-data-does-warp-collect-and-why";
 
 const DATA_MANAGEMENT_TITLE: &str = "Manage your data";
 const DATA_MANAGEMENT_DESCRIPTION: &str =
@@ -1560,7 +1559,7 @@ impl SettingsWidget for AppAnalyticsWidget {
         );
 
         // Show free tier note only for non-paid users
-        if !is_on_paid_plan {
+        if !is_on_paid_plan && !crate::local_offline::is_enabled() {
             column.add_child(
                 ui_builder
                     .paragraph(TELEMETRY_FREE_TIER_NOTE)

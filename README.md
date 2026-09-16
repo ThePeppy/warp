@@ -64,6 +64,7 @@ See [WARP.md](WARP.md) for the full engineering guide, including coding style, t
 This public fork is customized for offline / personal use: the OSS client launches without a Warp account and does not call Warp auth or billing servers. Cloud-only features (Drive sync, hosted AI, Oz) are hidden or no-op.
 
 - Flag: Cargo feature `local_offline`, or `WARP_LOCAL_OFFLINE=1` / `0`. Default **on** for `warp-oss`.
+- When on, leftover GraphQL / RTC / telemetry / Sentry / autoupdate clients are dead-ended or skipped (see Hardening in CUSTOM_BUILD.md).
 - macOS Apple Silicon builds: GitHub Actions workflow **Build macOS arm64** uploads an unsigned `WarpOss.app` zip so you do not need Xcode locally.
 - Details, Gatekeeper workaround, and what still needs Warp servers: [CUSTOM_BUILD.md](CUSTOM_BUILD.md).
 

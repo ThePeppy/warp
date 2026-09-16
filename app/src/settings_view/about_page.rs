@@ -54,7 +54,7 @@ impl SettingsWidget for AboutPageWidget {
     type View = AboutPageView;
 
     fn search_terms(&self) -> &str {
-        "about warp version"
+        "about warp version oss local"
     }
 
     fn render(
@@ -100,32 +100,42 @@ impl SettingsWidget for AboutPageWidget {
                     .finish(),
             ]);
 
-        Align::new(
-            Flex::column()
-                .with_cross_axis_alignment(CrossAxisAlignment::Center)
-                .with_child(
-                    ConstrainedBox::new(
-                        Image::new(
-                            AssetSource::Bundled { path: image_path },
-                            CacheOption::BySize,
-                        )
-                        .finish(),
+        let mut about_column = Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Center)
+            .with_child(
+                ConstrainedBox::new(
+                    Image::new(
+                        AssetSource::Bundled { path: image_path },
+                        CacheOption::BySize,
                     )
-                    .with_max_height(100.)
-                    .with_max_width(350.)
                     .finish(),
                 )
-                .with_child(version_row.finish())
-                .with_child(
-                    ui_builder
-                        .span("Copyright 2026 Warp")
-                        .build()
-                        .with_margin_top(16.)
-                        .finish(),
-                )
+                .with_max_height(100.)
+                .with_max_width(350.)
                 .finish(),
-        )
-        .finish()
+            )
+            .with_child(version_row.finish());
+
+        if crate::local_offline::is_enabled() {
+            about_column.add_child(
+                ui_builder
+                    .span(crate::local_offline::PRODUCT_LABEL.to_string())
+                    .with_soft_wrap()
+                    .build()
+                    .with_margin_top(16.)
+                    .finish(),
+            );
+        }
+
+        about_column.add_child(
+            ui_builder
+                .span("Copyright 2026 Warp")
+                .build()
+                .with_margin_top(16.)
+                .finish(),
+        );
+
+        Align::new(about_column.finish()).finish()
     }
 }
 

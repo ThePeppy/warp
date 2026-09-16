@@ -1292,7 +1292,14 @@ fn initialize_app(
 
     let user_is_logged_in = auth_state.is_logged_in();
 
-    if user_is_logged_in && !local_offline::is_enabled() {
+    if local_offline::is_enabled() {
+        // Local-offline: no user refresh and no startup telemetry. Missing
+        // Warp servers must not brick launch or revive a login-wall metric path.
+        log::info!(
+            "Local-offline mode ({label}): skipping startup telemetry and user refresh",
+            label = local_offline::PRODUCT_LABEL
+        );
+    } else if user_is_logged_in {
         // Skip refresh_user for CLI mode — the CLI handles auth refresh in
         // ensure_auth_state so it can detect invalid credentials before running
         // a command. Local-offline builds have no Warp session to refresh.

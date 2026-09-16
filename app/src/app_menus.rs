@@ -149,11 +149,13 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         ))
     }
 
-    menu_items.extend([
-        MenuItem::Separator,
-        updateable_custom_item_without_checkmark(CustomAction::ReferAFriend, ctx),
-        MenuItem::Separator,
-    ]);
+    if !crate::local_offline::is_enabled() {
+        menu_items.extend([
+            MenuItem::Separator,
+            updateable_custom_item_without_checkmark(CustomAction::ReferAFriend, ctx),
+            MenuItem::Separator,
+        ]);
+    }
 
     let preferences_menu_items = vec![
         updateable_custom_item_without_checkmark(CustomAction::ShowSettings, ctx),
@@ -245,7 +247,12 @@ fn make_new_app_menu(ctx: &AppContext) -> Menu {
         )));
     }
     menu_items.push(MenuItem::Standard(StandardAction::Quit));
-    Menu::new("Warp", menu_items)
+    let app_menu_title = if crate::local_offline::is_enabled() {
+        crate::local_offline::PRODUCT_LABEL
+    } else {
+        "Warp"
+    };
+    Menu::new(app_menu_title, menu_items)
 }
 
 fn make_new_file_menu(ctx: &AppContext) -> Menu {

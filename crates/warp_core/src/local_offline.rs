@@ -14,6 +14,18 @@
 /// Environment variable that overrides local-offline mode.
 pub const ENV_VAR: &str = "WARP_LOCAL_OFFLINE";
 
+/// Small AGPL-safe product label for About, window title, and channel strings.
+///
+/// Distinguishes this local-first fork from official Warp builds without
+/// stripping trademarks or implying an official Warp release.
+pub const PRODUCT_LABEL: &str = "Warp OSS local";
+
+/// Loopback dead-end used when local-offline mode must not reach production.
+pub const DEAD_END_HTTP_ROOT: &str = "http://127.0.0.1:0";
+
+/// Loopback dead-end WebSocket URL for RTC / GraphQL subscriptions.
+pub const DEAD_END_WS_URL: &str = "ws://127.0.0.1:0/graphql/v2";
+
 /// Parses a `WARP_LOCAL_OFFLINE` value. Returns `None` for unrecognized input.
 pub fn parse_env_value(value: &str) -> Option<bool> {
     match value.trim() {
@@ -72,5 +84,18 @@ mod tests {
         }
         assert_eq!(parse_env_value(""), None);
         assert_eq!(parse_env_value("maybe"), None);
+    }
+
+    #[test]
+    fn product_label_is_distinguishable_and_not_deceptive() {
+        assert!(PRODUCT_LABEL.contains("OSS"));
+        assert!(PRODUCT_LABEL.contains("local"));
+        assert!(!PRODUCT_LABEL.eq_ignore_ascii_case("Warp"));
+    }
+
+    #[test]
+    fn dead_end_urls_are_loopback_and_unroutable() {
+        assert!(DEAD_END_HTTP_ROOT.starts_with("http://127.0.0.1:0"));
+        assert!(DEAD_END_WS_URL.starts_with("ws://127.0.0.1:0"));
     }
 }

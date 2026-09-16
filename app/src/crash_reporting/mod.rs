@@ -181,6 +181,11 @@ impl ToSentryTags for CrashRecoveryMetadata {
 /// Initializes the crash reporting susbsystem.  Returns whether or not crash
 /// reporting is active.
 pub(crate) fn init(ctx: &mut AppContext) -> bool {
+    if crate::local_offline::is_enabled() {
+        log::info!("Local-offline mode: skipping crash reporting");
+        return false;
+    }
+
     if !FeatureFlag::CrashReporting.is_enabled() {
         log::info!("Crash reporting FeatureFlag is disabled; not initializing sentry.");
         return false;

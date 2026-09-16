@@ -3348,6 +3348,10 @@ impl SettingsWidget for UsageWidget {
         "a.i. ai usage limit plan"
     }
 
+    fn should_render(&self, _app: &AppContext) -> bool {
+        !crate::local_offline::is_enabled()
+    }
+
     fn render(
         &self,
         _view: &Self::View,

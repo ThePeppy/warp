@@ -202,7 +202,9 @@ impl CloudPreferencesSyncer {
     ) -> Self {
         let mut me = Self::new_internal(ctx, Arc::new(DefaultClientIdProvider), toml_file_path);
         me.force_local_wins_on_startup = force_local_wins_on_startup;
-        me.retry_failed_settings(ctx);
+        if !crate::local_offline::is_enabled() {
+            me.retry_failed_settings(ctx);
+        }
         me
     }
 
@@ -453,6 +455,11 @@ impl CloudPreferencesSyncer {
         force_cloud_to_match_local: ForceCloudToMatchLocal,
         ctx: &mut ModelContext<Self>,
     ) {
+        if crate::local_offline::is_enabled() {
+            log::info!("Local-offline mode: skipping settings sync");
+            return;
+        }
+
         let update_manager = UpdateManager::as_ref(ctx);
 
         // We wait for the cloud objects to load because we need to know if there are any cloud preferences
@@ -666,7 +673,9 @@ impl CloudPreferencesSyncer {
                 && !settings_manager.sync_regardless_of_users_syncing_setting(storage_key)
             {
                 // Skip syncing if settings sync is disabled and this particular cloud pref is not always synced.
-                log::debug!("Not syncing cloud preference with storage key {storage_key} because settings sync is disabled for it");
+                log::debug!(
+                    "Not syncing cloud preference with storage key {storage_key} because settings sync is disabled for it"
+                );
                 continue;
             }
 
@@ -683,7 +692,9 @@ impl CloudPreferencesSyncer {
                 .unwrap_or(false);
             if !is_current_value_syncable {
                 // Don't sync this preference if the current value is not syncable.
-                log::debug!("Not syncing cloud preference with storage key {storage_key} because the current value is not syncable");
+                log::debug!(
+                    "Not syncing cloud preference with storage key {storage_key} because the current value is not syncable"
+                );
                 continue;
             }
 

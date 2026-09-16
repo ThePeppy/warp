@@ -45,6 +45,11 @@ impl TelemetryCollector {
     }
 
     pub fn initialize_telemetry_collection(&self, ctx: &mut ModelContext<TelemetryCollector>) {
+        if crate::local_offline::is_enabled() || !ChannelState::is_telemetry_available() {
+            log::info!("Local-offline / no telemetry config: skipping Rudderstack collection");
+            return;
+        }
+
         // Start a background thread to periodically flush events from the telemetry event queue.
         if ChannelState::is_release_bundle() || FeatureFlag::WithSandboxTelemetry.is_enabled() {
             // Flush the events to Rudderstack that were persisted into a file the last time the app was
@@ -102,6 +107,11 @@ impl TelemetryCollector {
     /// * Write events to disk, for sending on the next app startup
     /// * Synchronously send events to rudderstack
     pub fn flush_telemetry_events_for_shutdown(&self, ctx: &mut ModelContext<TelemetryCollector>) {
+        if crate::local_offline::is_enabled() || !ChannelState::is_telemetry_available() {
+            clear_event_queue();
+            return;
+        }
+
         let execution_mode = AppExecutionMode::as_ref(ctx);
 
         if execution_mode.send_telemetry_at_shutdown() {
