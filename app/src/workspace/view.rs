@@ -8298,48 +8298,50 @@ impl Workspace {
             MenuItem::Separator,
         ]);
 
-        if self.auth_state.is_anonymous_or_logged_out() {
+        if !crate::local_only::is_enabled() {
+            if self.auth_state.is_anonymous_or_logged_out() {
+                items.push(
+                    MenuItemFields::new("Sign up")
+                        .with_on_select_action(WorkspaceAction::SignupAnonymousUser)
+                        .into_item(),
+                );
+            }
+
+            // Check if the user is on any paid plan to determine whether to show "Billing and Usage" or "Upgrade"
+            let is_on_paid_plan = UserWorkspaces::as_ref(app)
+                .current_workspace()
+                .map(|workspace| workspace.billing_metadata.is_user_on_paid_plan())
+                .unwrap_or(false);
+
+            if is_on_paid_plan {
+                items.push(
+                    MenuItemFields::new("Billing and usage")
+                        .with_on_select_action(WorkspaceAction::ShowSettingsPage(
+                            SettingsSection::BillingAndUsage,
+                        ))
+                        .into_item(),
+                );
+            } else {
+                items.push(
+                    MenuItemFields::new("Upgrade")
+                        .with_on_select_action(WorkspaceAction::ShowUpgrade)
+                        .into_item(),
+                );
+            }
+
             items.push(
-                MenuItemFields::new("Sign up")
-                    .with_on_select_action(WorkspaceAction::SignupAnonymousUser)
+                MenuItemFields::new("Invite a friend")
+                    .with_on_select_action(WorkspaceAction::ShowReferralSettingsPage)
                     .into_item(),
             );
-        }
 
-        // Check if the user is on any paid plan to determine whether to show "Billing and Usage" or "Upgrade"
-        let is_on_paid_plan = UserWorkspaces::as_ref(app)
-            .current_workspace()
-            .map(|workspace| workspace.billing_metadata.is_user_on_paid_plan())
-            .unwrap_or(false);
-
-        if is_on_paid_plan {
-            items.push(
-                MenuItemFields::new("Billing and usage")
-                    .with_on_select_action(WorkspaceAction::ShowSettingsPage(
-                        SettingsSection::BillingAndUsage,
-                    ))
-                    .into_item(),
-            );
-        } else {
-            items.push(
-                MenuItemFields::new("Upgrade")
-                    .with_on_select_action(WorkspaceAction::ShowUpgrade)
-                    .into_item(),
-            );
-        }
-
-        items.push(
-            MenuItemFields::new("Invite a friend")
-                .with_on_select_action(WorkspaceAction::ShowReferralSettingsPage)
-                .into_item(),
-        );
-
-        if !self.auth_state.is_anonymous_or_logged_out() {
-            items.push(
-                MenuItemFields::new("Log out")
-                    .with_on_select_action(WorkspaceAction::LogOut)
-                    .into_item(),
-            );
+            if !self.auth_state.is_anonymous_or_logged_out() {
+                items.push(
+                    MenuItemFields::new("Log out")
+                        .with_on_select_action(WorkspaceAction::LogOut)
+                        .into_item(),
+                );
+            }
         }
         items
     }
@@ -19950,6 +19952,9 @@ impl TypedActionView for Workspace {
             AutoupdateFailureLink => self.open_autoupdate_failure_link(ctx),
             ApplyUpdate => self.apply_update(ctx),
             LogOut => {
+                if crate::local_only::is_enabled() {
+                    return;
+                }
                 // Need to dispatch global action, or else we will not be able to retrieve
                 // the currently active session in the log out modal.
                 ctx.dispatch_global_action("app:maybe_log_out", ());
@@ -19986,6 +19991,9 @@ impl TypedActionView for Workspace {
                 source,
             } => self.toggle_palette(*palette_mode, *source, ctx),
             ShowUpgrade => {
+                if crate::local_only::is_enabled() {
+                    return;
+                }
                 send_telemetry_from_ctx!(TelemetryEvent::UserMenuUpgradeClicked, ctx);
 
                 let auth_state = AuthStateProvider::as_ref(ctx).get();
@@ -20687,6 +20695,9 @@ impl TypedActionView for Workspace {
                 send_telemetry_from_ctx!(TelemetryEvent::InitiateReauth, ctx);
             }
             SignupAnonymousUser => {
+                if crate::local_only::is_enabled() {
+                    return;
+                }
                 self.initiate_user_signup(AnonymousUserSignupEntrypoint::SignUpButton, ctx);
             }
             SignInAnonymousWebUser => {

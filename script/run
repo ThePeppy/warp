@@ -18,7 +18,7 @@ cd "${REPO_ROOT}"
 
 OS_TYPE="$(uname -s)"
 
-FEATURES="gui"
+FEATURES="gui,local_only"
 
 ./script/install_channel_config || echo "Skipping internal channel config installation (no repo access)."
 

@@ -2850,7 +2850,9 @@ impl SettingsPageMeta for AISettingsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        FeatureFlag::AgentMode.is_enabled()
+        // Hosted Warp Agent stays off in local-only builds, but this backing
+        // page also hosts third-party CLI agent settings that work offline.
+        FeatureFlag::AgentMode.is_enabled() || crate::local_only::is_enabled()
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {

@@ -1214,14 +1214,29 @@ impl SettingsView {
             SettingsNavItem::Page(SettingsSection::Privacy),
             SettingsNavItem::Page(SettingsSection::About),
         ];
+        nav_items.retain(|item| match item {
+            SettingsNavItem::Page(section) => {
+                crate::local_only::is_settings_section_visible(*section)
+            }
+            SettingsNavItem::Umbrella(_) => true,
+        });
+        for item in &mut nav_items {
+            if let SettingsNavItem::Umbrella(umbrella) = item {
+                umbrella
+                    .subpages
+                    .retain(|section| crate::local_only::is_settings_section_visible(*section));
+            }
+        }
+        nav_items.retain(|item| match item {
+            SettingsNavItem::Umbrella(umbrella) => !umbrella.subpages.is_empty(),
+            SettingsNavItem::Page(_) => true,
+        });
 
-        // Resolve the initial page: map internal backing-page sections to their default subpage.
-        let initial_page = match page {
-            Some(SettingsSection::AI) => SettingsSection::WarpAgent,
-            Some(SettingsSection::Code) => SettingsSection::CodeIndexing,
-            Some(section) if section.is_subpage() => section,
-            other => other.unwrap_or_default(),
-        };
+        // Resolve the initial page: map internal backing-page sections to a
+        // visible default subpage (Warp Agent when online, CLI agents locally).
+        let initial_page = page
+            .map(crate::local_only::resolve_settings_section)
+            .unwrap_or_default();
 
         // Auto-expand the umbrella if the initial page is one of its subpages.
         if initial_page.is_subpage() {
@@ -1846,13 +1861,15 @@ impl SettingsView {
         allow_steal_focus: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Map internal backing-page sections to their default subpage.
+        // Map internal backing-page sections to a visible default subpage.
         // External callers should use subpage variants directly.
-        let section = match section {
-            SettingsSection::AI => SettingsSection::WarpAgent,
-            SettingsSection::Code => SettingsSection::CodeIndexing,
-            other => other,
-        };
+        let section = crate::local_only::resolve_settings_section(section);
+
+        if !crate::local_only::is_settings_section_visible(section)
+            && !crate::local_only::is_settings_section_visible(section.parent_page_section())
+        {
+            return;
+        }
 
         // For AI subpages, the backing page is the AI page. Check it exists.
         let page_section = section.parent_page_section();
@@ -1944,6 +1961,9 @@ impl SettingsView {
     }
 
     fn should_render_page(&self, settings_page: &SettingsPage, app: &AppContext) -> bool {
+        if !crate::local_only::is_settings_section_visible(settings_page.section) {
+            return false;
+        }
         match &settings_page.view_handle {
             SettingsPageViewHandle::Main(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Teams(v) => v.as_ref(app).should_render(app),

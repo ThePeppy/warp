@@ -686,6 +686,9 @@ impl SettingsPageMeta for BillingAndUsagePageView {
     }
 
     fn should_render(&self, ctx: &AppContext) -> bool {
+        if !crate::local_only::is_settings_section_visible(SettingsSection::BillingAndUsage) {
+            return false;
+        }
         let is_anonymous = AuthStateProvider::as_ref(ctx)
             .get()
             .is_anonymous_or_logged_out();

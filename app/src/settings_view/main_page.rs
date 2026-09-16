@@ -277,15 +277,18 @@ impl MainSettingsPageView {
             Box::new(DividerWidget {}),
         ];
 
-        widgets.push(Box::new(SettingsSyncWidget::default()));
-
-        widgets.push(Box::new(EarnRewardsWidget::default()));
+        if !crate::local_only::is_enabled() {
+            widgets.push(Box::new(SettingsSyncWidget::default()));
+            widgets.push(Box::new(EarnRewardsWidget::default()));
+        }
 
         if ChannelState::app_version().is_some() {
             widgets.push(Box::new(VersionInfoWidget::default()));
         }
 
-        widgets.push(Box::new(LogoutWidget::default()));
+        if !crate::local_only::is_enabled() {
+            widgets.push(Box::new(LogoutWidget::default()));
+        }
 
         let page = PageType::new_uncategorized(widgets, Some("Account"));
 
@@ -315,6 +318,31 @@ struct AccountWidget {
 }
 
 impl AccountWidget {
+    fn render_local_only_account_info(&self, appearance: &Appearance) -> Box<dyn Element> {
+        let theme = appearance.theme();
+        Flex::column()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .with_child(
+                Text::new("Local-only mode", appearance.ui_font_family(), 16.)
+                    .with_color(theme.active_ui_text_color().into())
+                    .finish(),
+            )
+            .with_child(
+                Container::new(
+                    Text::new(
+                        "This unofficial fork runs as a local terminal. Warp account login, billing, and hosted cloud features are disabled.",
+                        appearance.ui_font_family(),
+                        REGULAR_TEXT_FONT_SIZE,
+                    )
+                    .with_color(theme.nonactive_ui_text_color().into())
+                    .finish(),
+                )
+                .with_margin_top(8.)
+                .finish(),
+            )
+            .finish()
+    }
+
     fn render_anonymous_account_info(
         &self,
         auth_state: &AuthState,
@@ -608,7 +636,7 @@ impl SettingsWidget for AccountWidget {
     type View = MainSettingsPageView;
 
     fn search_terms(&self) -> &str {
-        "account sign up"
+        "account sign up local-only offline"
     }
 
     fn render(
@@ -617,7 +645,9 @@ impl SettingsWidget for AccountWidget {
         appearance: &Appearance,
         app: &AppContext,
     ) -> Box<dyn Element> {
-        let account_info = if view.auth_state.is_anonymous_or_logged_out() {
+        let account_info = if crate::local_only::is_enabled() {
+            self.render_local_only_account_info(appearance)
+        } else if view.auth_state.is_anonymous_or_logged_out() {
             self.render_anonymous_account_info(view.auth_state.as_ref(), appearance)
         } else {
             let profile_image_source = view.auth_state.user_photo_url().map(|url| {
@@ -680,9 +710,10 @@ impl SettingsWidget for SettingsSyncWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        !crate::local_only::is_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
     }
 
     fn render(
@@ -769,9 +800,10 @@ impl SettingsWidget for EarnRewardsWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        !crate::local_only::is_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
     }
 
     fn render(
@@ -1070,9 +1102,10 @@ impl SettingsWidget for LogoutWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        !crate::local_only::is_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
     }
 
     fn render(
@@ -1101,6 +1134,9 @@ impl SettingsPageMeta for MainSettingsPageView {
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {
+        if crate::local_only::is_enabled() {
+            return;
+        }
         // We want to immediately see if the user is part of a workspace rather than wait for the next poll.
         std::mem::drop(
             TeamUpdateManager::handle(ctx)

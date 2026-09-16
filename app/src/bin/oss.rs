@@ -9,6 +9,10 @@ use warp_core::{
 };
 
 // Simple wrapper around warp::run() for Warp OSS builds.
+//
+// This unofficial fork enables the `local_only` cargo feature from
+// `./script/run` and the OSS bundle scripts so the app starts without a
+// Warp account. Build with `--features local_only` if invoking cargo directly.
 fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
