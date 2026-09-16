@@ -1,0 +1,121 @@
+# Build a distributable macOS Apple Silicon (arm64) .app for this local-first
+# fork. Run from the Actions tab (workflow_dispatch) — you do not need Xcode
+# on your own machine. See CUSTOM_BUILD.md for install / Gatekeeper notes.
+name: Build macOS arm64
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Cargo profile (release is lighter; release-lto is slower/heavier)
+        type: choice
+        default: release
+        options:
+          - release
+          - release-lto
+          - dev
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_RELEASE_DEBUG: "line-tables-only"
+  RUSTFLAGS: "-C debuginfo=line-tables-only --cfg=web_sys_unstable_apis"
+
+jobs:
+  build-macos-arm64:
+    name: Bundle WarpOss (macos arm64)
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Free disk space
+        run: |
+          set -euo pipefail
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /Library/Developer/CoreSimulator/Profiles/Runtimes \
+            "$HOME/Library/Developer/CoreSimulator" || true
+          df -h
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Add Apple Silicon target
+        run: rustup target add aarch64-apple-darwin
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: macos-arm64-oss-${{ github.event.inputs.profile || 'release' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
+
+      - name: Install Homebrew build tools
+        run: brew install create-dmg jq protobuf
+
+      - name: Install cargo-bundle
+        run: script/install_cargo_bundle
+
+      - name: Install cargo-about (third-party licenses)
+        run: cargo install --locked cargo-about@0.8.4
+
+      - name: Download Metal toolchain
+        run: xcodebuild -downloadComponent MetalToolchain || true
+
+      - name: Bundle unsigned OSS arm64 app
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WARP_BUNDLE_PROFILE: ${{ github.event.inputs.profile || 'release' }}
+          WARP_LOCAL_OFFLINE: "1"
+        run: |
+          set -euo pipefail
+          if [[ "${WARP_BUNDLE_PROFILE}" == "dev" ]]; then
+            ./script/bundle --channel oss --arch aarch64 --nouniversal --nosign --debug
+          else
+            ./script/bundle --channel oss --arch aarch64 --nouniversal --nosign
+          fi
+
+      - name: Locate and zip app bundle
+        id: zip
+        run: |
+          set -euo pipefail
+          PROFILE_DIR="${WARP_BUNDLE_PROFILE:-release}"
+          if [[ "$PROFILE_DIR" == "dev" ]]; then
+            PROFILE_DIR="debug"
+          fi
+          CANDIDATES=(
+            "target/${PROFILE_DIR}/bundle/osx/WarpOss.app"
+            "target/aarch64-apple-darwin/${PROFILE_DIR}/bundle/osx/WarpOss.app"
+          )
+          APP=""
+          for candidate in "${CANDIDATES[@]}"; do
+            if [[ -d "$candidate" ]]; then
+              APP="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$APP" ]]; then
+            echo "WarpOss.app not found. Searched:"
+            printf '  %s\n' "${CANDIDATES[@]}"
+            find target -name 'WarpOss.app' -type d | head
+            exit 1
+          fi
+          echo "Found app at $APP"
+          mkdir -p dist
+          ditto -c -k --keepParent "$APP" dist/WarpOss-macos-arm64-unsigned.zip
+          if [[ -f "target/${PROFILE_DIR}/bundle/osx/WarpOss.dmg" ]]; then
+            cp "target/${PROFILE_DIR}/bundle/osx/WarpOss.dmg" dist/WarpOss-macos-arm64-unsigned.dmg
+          fi
+          ls -lh dist
+          echo "app_path=$APP" >> "$GITHUB_OUTPUT"
+        env:
+          WARP_BUNDLE_PROFILE: ${{ github.event.inputs.profile || 'release' }}
+
+      - name: Upload macOS arm64 artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: WarpOss-macos-arm64-unsigned
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 14
