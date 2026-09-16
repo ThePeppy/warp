@@ -456,10 +456,6 @@ fn derive_http_origin_from_ws_url(ws_url: &str) -> Option<String> {
     Some(origin)
 }
 
-#[cfg(all(test, not(feature = "test-util")))]
-#[path = "state_tests.rs"]
-mod tests;
-
 /// True when this process must not contact Warp production endpoints.
 fn production_endpoints_disabled() -> bool {
     crate::local_offline::is_compiled_or_env_enabled()
@@ -480,75 +476,6 @@ fn disable_production_network(config: &mut ChannelConfig) {
     config.telemetry_config = None;
     config.autoupdate_config = None;
     config.crash_reporting_config = None;
-}
-
-#[cfg(test)]
-mod local_offline_network_tests {
-    use super::*;
-    use crate::channel::config::{AutoupdateConfig, CrashReportingConfig, TelemetryConfig};
-
-    #[test]
-    fn disable_production_network_clears_phone_home_config() {
-        let mut config = ChannelConfig {
-            app_id: AppId::new("dev", "warp", "WarpOss"),
-            logfile_name: "warp.log".into(),
-            server_config: WarpServerConfig::production(),
-            oz_config: OzConfig::production(),
-            telemetry_config: Some(TelemetryConfig {
-                telemetry_file_name: "events".into(),
-                rudderstack_config: None,
-            }),
-            autoupdate_config: Some(AutoupdateConfig {
-                releases_base_url: "https://releases.warp.dev".into(),
-                show_autoupdate_menu_items: true,
-            }),
-            crash_reporting_config: Some(CrashReportingConfig {
-                sentry_url: "https://example.ingest.sentry.io/1".into(),
-            }),
-            mcp_static_config: None,
-        };
-
-        disable_production_network(&mut config);
-
-        assert_eq!(
-            config.server_config.server_root_url.as_ref(),
-            crate::local_offline::DEAD_END_HTTP_ROOT
-        );
-        assert_eq!(
-            config.server_config.rtc_server_url.as_ref(),
-            crate::local_offline::DEAD_END_WS_URL
-        );
-        assert!(config.server_config.session_sharing_server_url.is_none());
-        assert!(config.server_config.firebase_auth_api_key.is_empty());
-        assert_eq!(
-            config.oz_config.oz_root_url.as_ref(),
-            crate::local_offline::DEAD_END_HTTP_ROOT
-        );
-        assert!(config.telemetry_config.is_none());
-        assert!(config.autoupdate_config.is_none());
-        assert!(config.crash_reporting_config.is_none());
-    }
-
-    #[test]
-    fn production_config_targets_warp_hosts() {
-        let server = WarpServerConfig::production();
-        assert!(server.server_root_url.contains("app.warp.dev"));
-        assert!(server.rtc_server_url.contains("rtc.app.warp.dev"));
-        let oz = OzConfig::production();
-        assert!(oz.oz_root_url.contains("oz.warp.dev"));
-    }
-
-    #[test]
-    fn product_display_name_is_official_unless_local_offline() {
-        if crate::local_offline::is_compiled_or_env_enabled() {
-            assert_eq!(
-                ChannelState::product_display_name(),
-                crate::local_offline::PRODUCT_LABEL
-            );
-        } else {
-            assert_eq!(ChannelState::product_display_name(), "Warp");
-        }
-    }
 }
 
 fn app_id_from_bundle() -> Option<AppId> {
@@ -586,4 +513,77 @@ fn app_id_from_bundle() -> Option<AppId> {
     }
 
     None
+}
+
+#[cfg(all(test, not(feature = "test-util")))]
+#[path = "state_tests.rs"]
+mod tests;
+
+#[cfg(test)]
+mod local_offline_network_tests {
+    use super::*;
+    use crate::channel::config::{AutoupdateConfig, CrashReportingConfig, TelemetryConfig};
+
+    #[test]
+    fn disable_production_network_clears_phone_home_config() {
+        let mut config = ChannelConfig {
+            app_id: AppId::new("dev", "warp", "WarpOss"),
+            logfile_name: "warp.log".into(),
+            server_config: WarpServerConfig::production(),
+            oz_config: OzConfig::production(),
+            telemetry_config: Some(TelemetryConfig {
+                telemetry_file_name: "events".into(),
+                rudderstack_config: None,
+            }),
+            autoupdate_config: Some(AutoupdateConfig {
+                releases_base_url: "https://releases.warp.dev".into(),
+                show_autoupdate_menu_items: true,
+            }),
+            crash_reporting_config: Some(CrashReportingConfig {
+                sentry_url: "https://example.ingest.sentry.io/1".into(),
+            }),
+            mcp_static_config: None,
+        };
+
+        disable_production_network(&mut config);
+
+        assert_eq!(
+            &*config.server_config.server_root_url,
+            crate::local_offline::DEAD_END_HTTP_ROOT
+        );
+        assert_eq!(
+            &*config.server_config.rtc_server_url,
+            crate::local_offline::DEAD_END_WS_URL
+        );
+        assert!(config.server_config.session_sharing_server_url.is_none());
+        assert!(config.server_config.firebase_auth_api_key.is_empty());
+        assert_eq!(
+            &*config.oz_config.oz_root_url,
+            crate::local_offline::DEAD_END_HTTP_ROOT
+        );
+        assert!(config.telemetry_config.is_none());
+        assert!(config.autoupdate_config.is_none());
+        assert!(config.crash_reporting_config.is_none());
+    }
+
+    #[test]
+    fn production_config_targets_warp_hosts() {
+        let server = WarpServerConfig::production();
+        assert!(server.server_root_url.contains("app.warp.dev"));
+        assert!(server.rtc_server_url.contains("rtc.app.warp.dev"));
+        let oz = OzConfig::production();
+        assert!(oz.oz_root_url.contains("oz.warp.dev"));
+    }
+
+    #[test]
+    fn product_display_name_is_official_unless_local_offline() {
+        if crate::local_offline::is_compiled_or_env_enabled() {
+            assert_eq!(
+                ChannelState::product_display_name(),
+                crate::local_offline::PRODUCT_LABEL
+            );
+        } else {
+            assert_eq!(ChannelState::product_display_name(), "Warp");
+        }
+    }
 }
