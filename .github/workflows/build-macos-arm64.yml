@@ -1,0 +1,198 @@
+# Build an unofficial local-only WarpOss .app for Apple Silicon.
+#
+# This workflow is the delivery path for fork owners who do not want to install
+# Xcode locally. GitHub-hosted macos-14/macos-15 runners already include Xcode.
+#
+# Official create_release.yml signing/notarization secrets are optional. When
+# they are absent the script ad-hoc signs (--selfsign) and uploads an unsigned
+# artifact. macOS Gatekeeper will require a right-click → Open the first time.
+#
+# Does not use the official prepare_environment action: that pins Xcode 26 and
+# warpdotdev-only runners/secrets that a public fork does not have.
+
+name: Build macOS Apple Silicon (local-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Cargo profile to build
+        type: choice
+        default: release-lto
+        options:
+          - release-lto
+          - release-lto-debug_assertions
+          - release
+          - dev
+      create_github_release:
+        description: Also attach artifacts to a GitHub Release
+        type: boolean
+        default: false
+      release_tag:
+        description: Tag name for the GitHub Release (required if creating a release)
+        type: string
+        required: false
+  push:
+    branches:
+      - cursor/local-only-macos-arm64-8a73
+      - local-only/**
+    paths-ignore:
+      - '**.md'
+      - 'specs/**'
+      - '.claude/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-macos-arm64-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  # Keep debuginfo small on GitHub-hosted runners.
+  RUSTFLAGS: -C debuginfo=line-tables-only
+
+jobs:
+  build:
+    name: Bundle WarpOss (aarch64-apple-darwin)
+    runs-on: macos-15
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.92.0"
+          targets: aarch64-apple-darwin
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: macos-arm64-local-only
+          save-if: ${{ github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' }}
+
+      - name: Install Homebrew build dependencies
+        run: |
+          brew update
+          brew install protobuf create-dmg pkgconf jq || true
+          # cargo-bundle from the official GCS cache is warpdotdev-internal;
+          # install the same git revision the repo bootstrap script uses.
+          cargo install cargo-bundle --git https://github.com/burtonageo/cargo-bundle --rev ae4c76e92c08774bf54ff077b1c52e3d1cd6c16d
+          cargo install --locked cargo-about@0.8.4
+        shell: bash
+
+      - name: Download Metal toolchain if needed
+        run: xcodebuild -downloadComponent MetalToolchain || echo "Metal toolchain download skipped"
+        shell: bash
+
+      - name: Show Xcode and rustc
+        run: |
+          xcodebuild -version
+          rustc --version
+          rustup show
+          uname -m
+        shell: bash
+
+      - name: Bundle unsigned Apple Silicon app
+        id: bundle_app
+        run: |
+          PROFILE="${{ github.event.inputs.profile || 'release-lto' }}"
+          echo "Building WarpOss with profile $PROFILE and feature local_only"
+          ./script/macos/bundle \
+            --channel oss \
+            --arch aarch64 \
+            --selfsign \
+            --features local_only \
+            --profile "$PROFILE"
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stage artifacts
+        id: stage
+        run: |
+          set -euo pipefail
+          APP_PATH=""
+          for candidate in \
+            target/aarch64-apple-darwin/*/bundle/osx/WarpOss.app \
+            target/*/bundle/osx/WarpOss.app; do
+            if [[ -d "$candidate" ]]; then
+              APP_PATH="$candidate"
+              break
+            fi
+          done
+          if [[ -z "$APP_PATH" ]]; then
+            echo "WarpOss.app not found" >&2
+            find target -name 'WarpOss.app' -type d || true
+            exit 1
+          fi
+
+          STAGING="$RUNNER_TEMP/warp-oss-macos-arm64"
+          mkdir -p "$STAGING"
+          ditto "$APP_PATH" "$STAGING/WarpOss.app"
+
+          ZIP_NAME="WarpOss-macos-arm64.zip"
+          ditto -c -k --keepParent "$STAGING/WarpOss.app" "$STAGING/$ZIP_NAME"
+
+          DMG_PATH=""
+          for dmg in \
+            target/aarch64-apple-darwin/*/bundle/osx/WarpOss.dmg \
+            target/aarch64-apple-darwin/*/bundle/osx/WarpOss-arm64.dmg \
+            target/*/bundle/osx/WarpOss.dmg; do
+            if [[ -f "$dmg" ]]; then
+              DMG_PATH="$dmg"
+              break
+            fi
+          done
+
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
+          echo "zip_path=$STAGING/$ZIP_NAME" >> "$GITHUB_OUTPUT"
+          if [[ -n "$DMG_PATH" ]]; then
+            cp "$DMG_PATH" "$STAGING/$(basename "$DMG_PATH")"
+            echo "dmg_path=$STAGING/$(basename "$DMG_PATH")" >> "$GITHUB_OUTPUT"
+          fi
+          ls -lh "$STAGING"
+        shell: bash
+
+      - name: Upload .app zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpOss-macos-arm64
+          path: ${{ steps.stage.outputs.zip_path }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload DMG
+        if: ${{ steps.stage.outputs.dmg_path != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: WarpOss-macos-arm64-dmg
+          path: ${{ steps.stage.outputs.dmg_path }}
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Create GitHub Release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.create_github_release && inputs.release_tag != '' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          name: Local-only WarpOss ${{ inputs.release_tag }} (macOS Apple Silicon)
+          body: |
+            Unofficial local-only WarpOss build for Apple Silicon.
+
+            This build does **not** require a Warp account. It is ad-hoc signed
+            (not notarized). On first launch: right-click the app → Open.
+
+            See the README "Local-only macOS fork" section for details.
+          files: |
+            ${{ steps.stage.outputs.zip_path }}
+            ${{ steps.stage.outputs.dmg_path }}
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

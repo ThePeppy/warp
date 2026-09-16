@@ -1753,7 +1753,8 @@ impl RootView {
             workspace_setting,
         };
 
-        let auth_onboarding_state = if auth_state.is_logged_in() {
+        let auth_onboarding_state = if auth_state.is_logged_in() || crate::local_only::is_enabled()
+        {
             AuthOnboardingState::Terminal(workspace_args.create_workspace(ctx))
         } else {
             cfg_if! {
@@ -2257,7 +2258,8 @@ impl RootView {
                 // With old onboarding, we ask user to log in before onboarding, so don't do it after onboarding completes.
                 let requires_login = !is_logged_in
                     && (ai_enabled || warp_drive_enabled)
-                    && FeatureFlag::OpenWarpNewSettingsModes.is_enabled();
+                    && FeatureFlag::OpenWarpNewSettingsModes.is_enabled()
+                    && !crate::local_only::is_enabled();
 
                 if requires_login {
                     let tutorial = OnboardingTutorial::from(selected_settings.clone());

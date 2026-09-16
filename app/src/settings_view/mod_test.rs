@@ -4,6 +4,16 @@ use settings_page::MatchData;
 // ── SettingsSection classification ──────────────────────────────────────────
 
 #[test]
+fn cloud_account_surfaces_match_local_only_helper() {
+    assert!(crate::local_only::is_cloud_account_settings_section(
+        SettingsSection::BillingAndUsage
+    ));
+    assert!(!crate::local_only::is_cloud_account_settings_section(
+        SettingsSection::Appearance
+    ));
+}
+
+#[test]
 fn ai_subpages_are_identified() {
     assert!(SettingsSection::WarpAgent.is_ai_subpage());
     assert!(SettingsSection::AgentProfiles.is_ai_subpage());

@@ -1214,6 +1214,23 @@ impl SettingsView {
             SettingsNavItem::Page(SettingsSection::Privacy),
             SettingsNavItem::Page(SettingsSection::About),
         ];
+        nav_items.retain(|item| match item {
+            SettingsNavItem::Page(section) => {
+                crate::local_only::is_settings_section_visible(*section)
+            }
+            SettingsNavItem::Umbrella(_) => true,
+        });
+        for item in &mut nav_items {
+            if let SettingsNavItem::Umbrella(umbrella) = item {
+                umbrella
+                    .subpages
+                    .retain(|section| crate::local_only::is_settings_section_visible(*section));
+            }
+        }
+        nav_items.retain(|item| match item {
+            SettingsNavItem::Umbrella(umbrella) => !umbrella.subpages.is_empty(),
+            SettingsNavItem::Page(_) => true,
+        });
 
         // Resolve the initial page: map internal backing-page sections to their default subpage.
         let initial_page = match page {
@@ -1854,6 +1871,12 @@ impl SettingsView {
             other => other,
         };
 
+        if !crate::local_only::is_settings_section_visible(section)
+            && !crate::local_only::is_settings_section_visible(section.parent_page_section())
+        {
+            return;
+        }
+
         // For AI subpages, the backing page is the AI page. Check it exists.
         let page_section = section.parent_page_section();
         if self.settings_page(page_section).is_none() {
@@ -1944,6 +1967,9 @@ impl SettingsView {
     }
 
     fn should_render_page(&self, settings_page: &SettingsPage, app: &AppContext) -> bool {
+        if !crate::local_only::is_settings_section_visible(settings_page.section) {
+            return false;
+        }
         match &settings_page.view_handle {
             SettingsPageViewHandle::Main(v) => v.as_ref(app).should_render(app),
             SettingsPageViewHandle::Teams(v) => v.as_ref(app).should_render(app),

@@ -44,6 +44,7 @@ mod gpu_state;
 mod input_classifier;
 mod interval_timer;
 mod linear;
+mod local_only;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod login_item;
 mod menu;
@@ -2780,7 +2781,11 @@ pub fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::CloudModeSetupV2,
         #[cfg(feature = "cloud_mode_input_v2")]
         FeatureFlag::CloudModeInputV2,
+        #[cfg(feature = "local_only")]
+        FeatureFlag::LocalOnly,
     ]);
+
+    crate::local_only::apply_to_enabled_features(&mut flags);
 
     flags
 }

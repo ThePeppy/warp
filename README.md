@@ -27,6 +27,85 @@
 
 [Warp](https://www.warp.dev) is an agentic development environment, born out of the terminal. Use Warp's built-in coding agent, or bring your own CLI agent (Claude Code, Codex, Gemini CLI, and others).
 
+> [!WARNING]
+> **This repository is an unofficial local-only fork** of the AGPL Warp client ([ThePeppy/warp](https://github.com/ThePeppy/warp)). It is not affiliated with Warp.dev. Official Warp server, hosted auth, Warp Drive backend, and Oz remain proprietary and are **not** in this repo. This fork keeps local terminal features and skips Warp account login / paid membership. Keep the AGPL and MIT license files when redistributing.
+
+## Local-only macOS fork
+
+This fork compiles with the `local_only` cargo feature so the app starts as a
+local terminal **without** Warp account login, registration, or a paid plan.
+
+`local_only` enables `skip_login` (an existing compile-time hook that installs
+an onboarded local user and fails authenticated Warp cloud requests) and hides
+account / billing / upgrade / hosted-AI UI. Cloud-only features degrade: they
+are hidden, disabled, or no-op — they must not block a local shell.
+
+### What still works locally
+
+- Local shells, tabs, panes, and session restoration
+- Local settings, themes, keybindings, and the settings file
+- Local completions that do not need Warp cloud
+- Local MCP servers and third-party CLI agents you run yourself (Claude Code, Codex, Gemini CLI, …)
+
+### What is hidden or no-op
+
+- Sign in / Sign up / Log out / Upgrade / Manage subscription / billing
+- Warp Drive cloud sync, teams, referrals, shared blocks
+- Hosted Warp Agent / Oz / cloud environments (they require a Warp account)
+
+Residual cloud code still exists in the tree (GraphQL clients, Firebase hooks,
+telemetry types). In `local_only` builds those calls fail closed instead of
+prompting for credentials. Do not invent Warp server credentials.
+
+### Building with `local_only`
+
+`./script/run` and the OSS bundle scripts enable `local_only` automatically:
+
+```bash
+./script/bootstrap   # once, on a Mac with Xcode (not required if you use CI)
+./script/run         # cargo features include local_only
+```
+
+If you invoke cargo yourself:
+
+```bash
+cargo run --bin warp-oss --features gui,local_only
+# or, to produce a .app on macOS:
+./script/macos/bundle --channel oss --arch aarch64 --selfsign --features local_only
+```
+
+To build the official login-gated client from this tree, omit `local_only`
+(and do not use `./script/run` as-is).
+
+### GitHub Actions: Apple Silicon artifact (no local Xcode)
+
+You do **not** need Xcode on your personal Mac. Use the workflow
+[`.github/workflows/build-macos-arm64.yml`](.github/workflows/build-macos-arm64.yml):
+
+1. On GitHub: **Actions → Build macOS Apple Silicon (local-only) → Run workflow**.
+2. Leave the profile at `release-lto` (or pick `dev` for a faster unsigned debug build).
+3. When the job finishes, download the `WarpOss-macos-arm64` artifact (zipped `.app`).
+   A `.dmg` is uploaded as `WarpOss-macos-arm64-dmg` when `create-dmg` succeeds.
+4. Optional: set **create_github_release** and a **release_tag** to attach the
+   same files to a GitHub Release.
+
+The workflow runs on `macos-15` (Apple Silicon), calls the repo's
+`script/macos/bundle` with `--channel oss --arch aarch64 --selfsign`, and does
+not need Apple Developer certificates. Official notarization secrets are unused.
+
+### Opening an unsigned / ad-hoc signed app on macOS
+
+Gatekeeper will block the first launch of an app that is not Developer ID
+signed and notarized:
+
+1. Unzip the artifact (or open the DMG) and copy `WarpOss.app` to `/Applications`
+   or another folder you control.
+2. **Right-click** `WarpOss.app` → **Open** → confirm **Open**.
+3. Or: System Settings → Privacy & Security → Open Anyway.
+
+`xattr -d com.apple.quarantine WarpOss.app` also clears the download quarantine
+if you trust the artifact you just built.
+
 ## Installation
 
 You can [download Warp](https://www.warp.dev/download) and [read our docs](https://docs.warp.dev/) for platform-specific instructions.

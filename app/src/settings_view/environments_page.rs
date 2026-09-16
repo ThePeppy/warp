@@ -2025,7 +2025,7 @@ impl SettingsPageMeta for EnvironmentsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        true
+        crate::local_only::is_settings_section_visible(SettingsSection::CloudEnvironments)
     }
 
     fn update_filter(&mut self, query: &str, ctx: &mut ViewContext<Self>) -> MatchData {
