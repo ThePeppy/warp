@@ -27,7 +27,7 @@ fn classifies_cloud_account_settings_sections() {
     assert!(is_cloud_account_settings_section(
         SettingsSection::OzCloudAPIKeys
     ));
-    assert!(is_cloud_account_settings_section(SettingsSection::AI));
+    assert!(!is_cloud_account_settings_section(SettingsSection::AI));
     assert!(is_cloud_account_settings_section(
         SettingsSection::WarpAgent
     ));
@@ -62,6 +62,50 @@ fn classifies_cloud_account_settings_sections() {
 }
 
 #[test]
+fn resolve_settings_section_keeps_local_ai_surfaces() {
+    assert_eq!(
+        resolve_settings_section(SettingsSection::Code),
+        SettingsSection::CodeIndexing
+    );
+    assert_eq!(
+        resolve_settings_section(SettingsSection::Appearance),
+        SettingsSection::Appearance
+    );
+
+    if is_enabled() {
+        assert_eq!(
+            resolve_settings_section(SettingsSection::AI),
+            SettingsSection::ThirdPartyCLIAgents
+        );
+        assert_eq!(
+            resolve_settings_section(SettingsSection::WarpAgent),
+            SettingsSection::ThirdPartyCLIAgents
+        );
+        assert_eq!(
+            resolve_settings_section(SettingsSection::BillingAndUsage),
+            SettingsSection::Account
+        );
+        assert_eq!(
+            resolve_settings_section(SettingsSection::ThirdPartyCLIAgents),
+            SettingsSection::ThirdPartyCLIAgents
+        );
+    } else {
+        assert_eq!(
+            resolve_settings_section(SettingsSection::AI),
+            SettingsSection::WarpAgent
+        );
+        assert_eq!(
+            resolve_settings_section(SettingsSection::WarpAgent),
+            SettingsSection::WarpAgent
+        );
+        assert_eq!(
+            resolve_settings_section(SettingsSection::BillingAndUsage),
+            SettingsSection::BillingAndUsage
+        );
+    }
+}
+
+#[test]
 fn visibility_follows_local_only_flag() {
     if is_enabled() {
         assert!(!is_settings_section_visible(
@@ -69,6 +113,11 @@ fn visibility_follows_local_only_flag() {
         ));
         assert!(is_settings_section_visible(SettingsSection::Appearance));
         assert!(is_settings_section_visible(SettingsSection::Account));
+        assert!(is_settings_section_visible(SettingsSection::AI));
+        assert!(is_settings_section_visible(
+            SettingsSection::ThirdPartyCLIAgents
+        ));
+        assert!(!is_settings_section_visible(SettingsSection::WarpAgent));
     } else {
         assert!(is_settings_section_visible(
             SettingsSection::BillingAndUsage

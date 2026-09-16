@@ -45,7 +45,7 @@ are hidden, disabled, or no-op — they must not block a local shell.
 - Local shells, tabs, panes, and session restoration
 - Local settings, themes, keybindings, and the settings file
 - Local completions that do not need Warp cloud
-- Local MCP servers and third-party CLI agents you run yourself (Claude Code, Codex, Gemini CLI, …)
+- Local MCP servers and third-party CLI agents you run yourself (Claude Code, Codex, Gemini CLI, …). Settings → Agents still shows **MCP servers** and **Third party CLI agents**; hosted Warp Agent / Knowledge stay hidden.
 
 ### What is hidden or no-op
 

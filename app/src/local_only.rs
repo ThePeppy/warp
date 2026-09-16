@@ -25,11 +25,33 @@ pub fn is_cloud_account_settings_section(section: SettingsSection) -> bool {
             | SettingsSection::WarpDrive
             | SettingsSection::CloudEnvironments
             | SettingsSection::OzCloudAPIKeys
-            | SettingsSection::AI
             | SettingsSection::WarpAgent
             | SettingsSection::AgentProfiles
             | SettingsSection::Knowledge
     )
+}
+
+/// Map a requested settings section onto one that should actually open.
+///
+/// `SettingsSection::AI` is a backing-page id (not a sidebar row). Hosted
+/// Agent / Knowledge / Profiles stay hidden; local CLI-agent settings remain.
+pub fn resolve_settings_section(section: SettingsSection) -> SettingsSection {
+    let section = match section {
+        SettingsSection::AI => SettingsSection::WarpAgent,
+        SettingsSection::Code => SettingsSection::CodeIndexing,
+        other => other,
+    };
+
+    if !is_enabled() || is_settings_section_visible(section) {
+        return section;
+    }
+
+    match section {
+        SettingsSection::WarpAgent
+        | SettingsSection::AgentProfiles
+        | SettingsSection::Knowledge => SettingsSection::ThirdPartyCLIAgents,
+        _ => SettingsSection::Account,
+    }
 }
 
 /// Whether a settings section should be shown in this build.

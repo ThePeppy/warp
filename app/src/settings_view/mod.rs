@@ -1232,13 +1232,11 @@ impl SettingsView {
             SettingsNavItem::Page(_) => true,
         });
 
-        // Resolve the initial page: map internal backing-page sections to their default subpage.
-        let initial_page = match page {
-            Some(SettingsSection::AI) => SettingsSection::WarpAgent,
-            Some(SettingsSection::Code) => SettingsSection::CodeIndexing,
-            Some(section) if section.is_subpage() => section,
-            other => other.unwrap_or_default(),
-        };
+        // Resolve the initial page: map internal backing-page sections to a
+        // visible default subpage (Warp Agent when online, CLI agents locally).
+        let initial_page = page
+            .map(crate::local_only::resolve_settings_section)
+            .unwrap_or_default();
 
         // Auto-expand the umbrella if the initial page is one of its subpages.
         if initial_page.is_subpage() {
@@ -1863,13 +1861,9 @@ impl SettingsView {
         allow_steal_focus: bool,
         ctx: &mut ViewContext<Self>,
     ) {
-        // Map internal backing-page sections to their default subpage.
+        // Map internal backing-page sections to a visible default subpage.
         // External callers should use subpage variants directly.
-        let section = match section {
-            SettingsSection::AI => SettingsSection::WarpAgent,
-            SettingsSection::Code => SettingsSection::CodeIndexing,
-            other => other,
-        };
+        let section = crate::local_only::resolve_settings_section(section);
 
         if !crate::local_only::is_settings_section_visible(section)
             && !crate::local_only::is_settings_section_visible(section.parent_page_section())
