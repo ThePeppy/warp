@@ -8,6 +8,10 @@ use super::UserUid;
 
 pub use warp_server_client::auth::{TEST_USER_EMAIL, TEST_USER_UID};
 
+/// Stable local-only identity for the offline fork. Not a Warp account UID.
+pub const LOCAL_OFFLINE_USER_UID: &str = "00000000-0000-4000-8000-localoffline";
+pub const LOCAL_OFFLINE_USER_EMAIL: &str = "local@localhost";
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AnonymousUserType {
     /// An anonymous user created from the native client.
@@ -172,6 +176,25 @@ impl User {
             metadata: UserMetadata {
                 email: TEST_USER_EMAIL.to_string(),
                 display_name: None,
+                photo_url: None,
+            },
+            is_onboarded: true,
+            needs_sso_link: false,
+            anonymous_user_type: None,
+            is_on_work_domain: false,
+            linked_at: None,
+            personal_object_limits: None,
+            principal_type: PrincipalType::User,
+        }
+    }
+
+    /// Synthetic user for the local-first fork. Not a Warp account.
+    pub fn local_offline() -> Self {
+        Self {
+            local_id: UserUid::new(LOCAL_OFFLINE_USER_UID),
+            metadata: UserMetadata {
+                email: LOCAL_OFFLINE_USER_EMAIL.to_string(),
+                display_name: Some("Local User".to_string()),
                 photo_url: None,
             },
             is_onboarded: true,

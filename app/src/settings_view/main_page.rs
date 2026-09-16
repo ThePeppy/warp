@@ -566,28 +566,35 @@ impl AccountWidget {
                 }
             }
         } else {
-            let plan_badge_child = render_customer_type_badge(appearance, "Free".into());
+            let plan_label = if crate::local_offline::is_enabled() {
+                "Local"
+            } else {
+                "Free"
+            };
+            let plan_badge_child = render_customer_type_badge(appearance, plan_label.into());
             plan_info.add_child(plan_badge_child);
 
-            plan_info.add_child(
-                appearance
-                    .ui_builder()
-                    .link(
-                        "Compare plans".into(),
-                        None,
-                        Some(Box::new(move |ctx| {
-                            ctx.dispatch_typed_action(MainPageAction::Upgrade {
-                                team_uid: None,
-                                user_id: current_user_id,
-                            });
-                        })),
-                        self.ui_state_handles.upgrade_link.clone(),
-                    )
-                    .soft_wrap(false)
-                    .build()
-                    .with_margin_top(8.)
-                    .finish(),
-            );
+            if !crate::local_offline::is_enabled() {
+                plan_info.add_child(
+                    appearance
+                        .ui_builder()
+                        .link(
+                            "Compare plans".into(),
+                            None,
+                            Some(Box::new(move |ctx| {
+                                ctx.dispatch_typed_action(MainPageAction::Upgrade {
+                                    team_uid: None,
+                                    user_id: current_user_id,
+                                });
+                            })),
+                            self.ui_state_handles.upgrade_link.clone(),
+                        )
+                        .soft_wrap(false)
+                        .build()
+                        .with_margin_top(8.)
+                        .finish(),
+                );
+            }
         }
 
         let mut row = Flex::row()
@@ -680,9 +687,10 @@ impl SettingsWidget for SettingsSyncWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        !crate::local_offline::is_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
     }
 
     fn render(
@@ -769,9 +777,10 @@ impl SettingsWidget for EarnRewardsWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        !crate::local_offline::is_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
     }
 
     fn render(
@@ -1070,9 +1079,10 @@ impl SettingsWidget for LogoutWidget {
     }
 
     fn should_render(&self, app: &AppContext) -> bool {
-        !AuthStateProvider::as_ref(app)
-            .get()
-            .is_anonymous_or_logged_out()
+        !crate::local_offline::is_enabled()
+            && !AuthStateProvider::as_ref(app)
+                .get()
+                .is_anonymous_or_logged_out()
     }
 
     fn render(

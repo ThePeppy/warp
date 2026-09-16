@@ -49,6 +49,19 @@ impl WarpServerConfig {
             firebase_auth_api_key: "AIzaSyBdy3O3S9hrdayLJxJ7mriBR4qgUaUygAs".into(),
         }
     }
+
+    /// Unreachable loopback endpoints so missing Warp servers cannot be contacted.
+    ///
+    /// Used by the local-first OSS fork. Requests fail immediately rather than
+    /// hanging on or authenticating against production Warp infrastructure.
+    pub fn disabled() -> Self {
+        Self {
+            server_root_url: "http://127.0.0.1:0".into(),
+            rtc_server_url: "ws://127.0.0.1:0/graphql/v2".into(),
+            session_sharing_server_url: None,
+            firebase_auth_api_key: "".into(),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -66,6 +79,14 @@ impl OzConfig {
     pub fn production() -> Self {
         Self {
             oz_root_url: "https://oz.warp.dev".into(),
+            workload_audience_url: None,
+        }
+    }
+
+    /// Unreachable loopback endpoint for local-first builds without Oz.
+    pub fn disabled() -> Self {
+        Self {
+            oz_root_url: "http://127.0.0.1:0".into(),
             workload_audience_url: None,
         }
     }

@@ -5,18 +5,32 @@
 use anyhow::Result;
 use warp_core::{
     channel::{Channel, ChannelConfig, ChannelState, OzConfig, WarpServerConfig},
-    AppId,
+    features::FeatureFlag,
+    local_offline, AppId,
 };
 
-// Simple wrapper around warp::run() for Warp OSS builds.
+// Simple wrapper around warp::run() for Warp OSS / local-first builds.
 fn main() -> Result<()> {
+    let local_first = local_offline::default_enabled_for_oss();
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
             app_id: AppId::new("dev", "warp", "WarpOss"),
-            logfile_name: "warp-oss.log".into(),
-            server_config: WarpServerConfig::production(),
-            oz_config: OzConfig::production(),
+            logfile_name: if local_first {
+                "warp-local.log".into()
+            } else {
+                "warp-oss.log".into()
+            },
+            server_config: if local_first {
+                WarpServerConfig::disabled()
+            } else {
+                WarpServerConfig::production()
+            },
+            oz_config: if local_first {
+                OzConfig::disabled()
+            } else {
+                OzConfig::production()
+            },
             telemetry_config: None,
             crash_reporting_config: None,
             autoupdate_config: None,
@@ -25,6 +39,12 @@ fn main() -> Result<()> {
     );
     if cfg!(debug_assertions) {
         state = state.with_additional_features(warp_core::features::DEBUG_FLAGS);
+    }
+    if local_first {
+        state = state.with_additional_features(&[
+            FeatureFlag::LocalOffline,
+            FeatureFlag::SkipFirebaseAnonymousUser,
+        ]);
     }
     ChannelState::set(state);
 
@@ -63,7 +83,7 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundleURLTypes</key>
     <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>warposs</string></array></dict></array>
     <key>NSHumanReadableCopyright</key>
-    <string>© 2026, Denver Technologies, Inc</string>
+    <string>© 2026, Denver Technologies, Inc. Modified local-first fork.</string>
     </dict>
     </plist>
 "#.as_bytes());

@@ -835,6 +835,9 @@ pub enum FeatureFlag {
     VerticalTabsSummaryMode,
 
     CloudModeInputV2,
+
+    /// Local-first fork mode: skip Warp account, billing, and cloud-only features.
+    LocalOffline,
 }
 
 static FLAG_STATES: [AtomicBool; cardinality::<FeatureFlag>()] =

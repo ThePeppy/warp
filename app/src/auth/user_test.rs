@@ -34,3 +34,13 @@ fn test_parse_user_profile() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn local_offline_user_is_onboarded_and_not_anonymous() {
+    let user = User::local_offline();
+    assert_eq!(user.metadata.email, LOCAL_OFFLINE_USER_EMAIL);
+    assert_eq!(user.username_for_display(), "Local User");
+    assert!(user.is_onboarded);
+    assert!(!user.is_user_anonymous());
+    assert!(!user.needs_sso_link);
+}

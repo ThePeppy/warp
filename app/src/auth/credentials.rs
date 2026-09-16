@@ -25,18 +25,26 @@ pub enum Credentials {
     },
     /// Authentication derived from an ambient browser session cookie.
     SessionCookie,
+    /// Local-first fork credentials: treated as signed in, never sent to Warp servers.
+    LocalOffline,
     /// Test credentials used in unit tests, integration tests, and skip_login builds.
     #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
     Test,
 }
 
 impl Credentials {
+    /// Returns true for the local-first fork credential that is never sent to Warp servers.
+    pub fn is_local_offline(&self) -> bool {
+        matches!(self, Credentials::LocalOffline)
+    }
+
     /// Returns the Firebase auth tokens if this is a Firebase credential.
     pub fn as_firebase(&self) -> Option<&FirebaseAuthTokens> {
         match self {
             Credentials::Firebase(tokens) => Some(tokens),
             Credentials::ApiKey { .. } => None,
             Credentials::SessionCookie => None,
+            Credentials::LocalOffline => None,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             Credentials::Test => None,
         }
@@ -48,6 +56,7 @@ impl Credentials {
             Credentials::ApiKey { key, .. } => Some(key),
             Credentials::Firebase(_) => None,
             Credentials::SessionCookie => None,
+            Credentials::LocalOffline => None,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             Credentials::Test => None,
         }
@@ -59,6 +68,7 @@ impl Credentials {
             Credentials::ApiKey { owner_type, .. } => *owner_type,
             Credentials::Firebase(_) => None,
             Credentials::SessionCookie => None,
+            Credentials::LocalOffline => None,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             Credentials::Test => None,
         }
@@ -70,6 +80,7 @@ impl Credentials {
             Credentials::Firebase(tokens) => Some(&tokens.refresh_token),
             Credentials::ApiKey { .. } => None,
             Credentials::SessionCookie => None,
+            Credentials::LocalOffline => None,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             Credentials::Test => None,
         }
@@ -81,6 +92,7 @@ impl Credentials {
             Credentials::Firebase(tokens) => AuthToken::Firebase(tokens.id_token.clone()),
             Credentials::ApiKey { key, .. } => AuthToken::ApiKey(key.clone()),
             Credentials::SessionCookie => AuthToken::NoAuth,
+            Credentials::LocalOffline => AuthToken::NoAuth,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             Credentials::Test => AuthToken::NoAuth,
         }
@@ -94,6 +106,7 @@ impl Credentials {
             ))),
             Credentials::ApiKey { key, .. } => Some(LoginToken::ApiKey(key.clone())),
             Credentials::SessionCookie => Some(LoginToken::SessionCookie),
+            Credentials::LocalOffline => None,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             Credentials::Test => None,
         }
@@ -107,11 +120,7 @@ pub enum AuthToken {
     Firebase(String),
     /// API key for direct server authentication.
     ApiKey(String),
-    /// No authentication token available (e.g. session cookie auth or test credentials).
-    #[cfg_attr(
-        not(any(test, feature = "integration_tests", feature = "skip_login")),
-        allow(dead_code)
-    )]
+    /// No authentication token available (e.g. session cookie, local-offline, or test credentials).
     NoAuth,
 }
 
@@ -170,7 +179,9 @@ impl FirebaseToken {
                 format!("https://securetoken.googleapis.com/v1/token?key={api_key}")
             }
             FirebaseToken::Custom(_) => {
-                format!("https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key={api_key}")
+                format!(
+                    "https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key={api_key}"
+                )
             }
         }
     }
@@ -211,5 +222,22 @@ impl RefreshToken {
 
     pub fn get(&self) -> &str {
         self.0.as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn local_offline_credentials_never_produce_server_tokens() {
+        let credentials = Credentials::LocalOffline;
+        assert!(credentials.is_local_offline());
+        assert!(credentials.as_firebase().is_none());
+        assert!(credentials.as_api_key().is_none());
+        assert!(credentials.refresh_token().is_none());
+        assert!(credentials.login_token().is_none());
+        assert!(matches!(credentials.bearer_token(), AuthToken::NoAuth));
+        assert!(credentials.bearer_token().as_bearer_token().is_none());
     }
 }

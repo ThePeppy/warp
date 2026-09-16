@@ -248,6 +248,11 @@ impl AuthManager {
 
     /// Refreshes the user's auth state using their existing credentials.
     pub fn refresh_user(&self, ctx: &mut ModelContext<Self>) {
+        if crate::local_offline::is_enabled() {
+            log::info!("Local-offline mode: skipping Warp user refresh");
+            return;
+        }
+
         let Some(credentials) = self.auth_state.credentials() else {
             log::warn!("Attempted to refresh user without credentials");
             return;
@@ -575,6 +580,10 @@ impl AuthManager {
         referral_code: Option<String>,
         ctx: &mut ModelContext<Self>,
     ) {
+        if crate::local_offline::is_enabled() {
+            log::info!("Local-offline mode: skipping Firebase anonymous user creation");
+            return;
+        }
         let anonymous_user_type = AnonymousUserType::NativeClientAnonymousUserFeatureGated;
 
         let auth_client = self.auth_client.clone();
@@ -638,6 +647,9 @@ impl AuthManager {
         auth_view_variant: AuthViewVariant,
         ctx: &mut ModelContext<Self>,
     ) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         if self.auth_state.is_anonymous_or_logged_out() {
             send_telemetry_from_ctx!(
                 TelemetryEvent::AnonymousUserAttemptLoginGatedFeature { feature },
@@ -648,6 +660,9 @@ impl AuthManager {
     }
 
     pub fn anonymous_user_hit_drive_object_limit(&self, ctx: &mut ModelContext<Self>) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         if self.auth_state.is_anonymous_or_logged_out() {
             send_telemetry_from_ctx!(TelemetryEvent::AnonymousUserHitCloudObjectLimit, ctx);
             ctx.emit(AuthManagerEvent::AttemptedLoginGatedFeature {

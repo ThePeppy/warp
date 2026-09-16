@@ -753,6 +753,8 @@ sequential_storage = []
 session_sharing = []
 session_sharing_acls = []
 skip_login = []
+# Local-first fork: no Warp account, billing, or cloud auth. See CUSTOM_BUILD.md.
+local_offline = ["warp_core/local_offline"]
 # This feature should only be enabled when building a self-contained binary with the bundle script.
 standalone = []
 prompt_suggestions_via_maa = []

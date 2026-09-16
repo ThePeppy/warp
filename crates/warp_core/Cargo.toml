@@ -9,6 +9,7 @@ license.workspace = true
 crash_reporting = ["dep:sentry", "dep:sentry-log"]
 integration_tests = []
 local_fs = []
+local_offline = []
 release_bundle = []
 test-util = ["dep:mockito", "warp_features/test-util"]
 

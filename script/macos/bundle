@@ -311,7 +311,19 @@ elif [[ $RELEASE_CHANNEL = "oss" ]]; then
     WARP_SCHEME_NAME="warposs"
     # The OSS channel does not ship Sentry, so drop the cocoa_sentry feature
     # (which would otherwise pull in the Sentry framework dependency).
-    FEATURES="release_bundle,extern_plist"
+    # local_offline is the compile-time switch for this fork's local-first mode.
+    FEATURES="release_bundle,extern_plist,local_offline"
+fi
+
+# Allow CI to pick a lighter Cargo profile (e.g. `release` instead of `release-lto`)
+# when GitHub-hosted macOS runners are memory-constrained.
+if [[ -n "${WARP_BUNDLE_PROFILE:-}" ]]; then
+    echo "Overriding Cargo profile with WARP_BUNDLE_PROFILE=${WARP_BUNDLE_PROFILE}"
+    CARGO_PROFILE="$WARP_BUNDLE_PROFILE"
+    TARGET_PROFILE_DIR="$CARGO_PROFILE"
+    if [[ "$CARGO_PROFILE" == "dev" ]]; then
+        TARGET_PROFILE_DIR="debug"
+    fi
 fi
 
 OUT_DIR="target/$TARGET_PROFILE_DIR/bundle/osx"

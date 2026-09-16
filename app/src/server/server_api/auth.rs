@@ -245,12 +245,17 @@ impl AuthClient for ServerApi {
             bail!("skip_login enabled; failing all authenticated requests");
         }
 
+        if crate::local_offline::is_enabled() {
+            return Ok(AuthToken::NoAuth);
+        }
+
         let Some(credentials) = self.auth_state.credentials() else {
             bail!("Attempted to retrieve access token when user is logged out");
         };
 
         match credentials {
             Credentials::ApiKey { key, .. } => Ok(AuthToken::ApiKey(key)),
+            Credentials::LocalOffline => Ok(AuthToken::NoAuth),
             Credentials::Firebase(auth_tokens) => {
                 let expiration_time = auth_tokens.expiration_time;
 

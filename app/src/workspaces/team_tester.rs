@@ -18,6 +18,9 @@ impl TeamTesterStatus {
     /// `force_refresh: true` when data is known to be invalidated (e.g. joining a team via an
     /// intent link).
     pub fn initiate_data_pollers(&mut self, force_refresh: bool, ctx: &mut ModelContext<Self>) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         ctx.emit(TeamTesterStatusEvent::InitiateDataPollers { force_refresh })
     }
 }

@@ -74,13 +74,21 @@ impl AuthState {
     }
 
     /// Creates and initializes auth state. Checks, in order:
-    /// 1. Test user (test/integration/skip_login builds)
-    /// 2. Provided API key
-    /// 3. WARP_USER_SECRET environment variable
-    /// 4. Persisted user from secure storage
+    /// 1. Local-offline fork user (no Warp account)
+    /// 2. Test user (test/integration/skip_login builds)
+    /// 3. Provided API key
+    /// 4. WARP_USER_SECRET environment variable
+    /// 5. Persisted user from secure storage
     #[cfg_attr(target_family = "wasm", allow(dead_code))]
     pub fn initialize(ctx: &AppContext, api_key: Option<String>) -> Self {
         let state = Self::new(ctx);
+
+        if crate::local_offline::is_enabled() {
+            log::info!("Local-offline mode: using synthetic local user (no Warp account)");
+            state.set_user(Some(User::local_offline()));
+            state.set_credentials(Some(Credentials::LocalOffline));
+            return state;
+        }
 
         if Self::should_use_test_user() {
             state.set_user(Some(User::test()));
@@ -168,6 +176,7 @@ impl AuthState {
             // Do not persist if using API keys, session cookies, or test credentials.
             (Some(_), Some(Credentials::ApiKey { .. })) => PersistAction::DoNothing,
             (Some(_), Some(Credentials::SessionCookie)) => PersistAction::DoNothing,
+            (Some(_), Some(Credentials::LocalOffline)) => PersistAction::DoNothing,
             #[cfg(any(test, feature = "integration_tests", feature = "skip_login"))]
             (Some(_), Some(Credentials::Test)) => PersistAction::DoNothing,
             // Credentials without a user, or user without credentials - transient states
@@ -231,6 +240,14 @@ impl AuthState {
     /// Determines whether the user should be considered as logged in.
     pub fn is_logged_in(&self) -> bool {
         self.credentials.read().is_some()
+    }
+
+    /// Returns true when this session uses the local-first fork credential.
+    pub fn is_local_offline(&self) -> bool {
+        self.credentials
+            .read()
+            .as_ref()
+            .is_some_and(Credentials::is_local_offline)
     }
 
     /// Returns whether the user should be treated as not having a full account.
