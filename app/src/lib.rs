@@ -44,6 +44,7 @@ mod gpu_state;
 mod input_classifier;
 mod interval_timer;
 mod linear;
+mod local_offline;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 mod login_item;
 mod menu;
@@ -1291,10 +1292,10 @@ fn initialize_app(
 
     let user_is_logged_in = auth_state.is_logged_in();
 
-    if user_is_logged_in {
+    if user_is_logged_in && !local_offline::is_enabled() {
         // Skip refresh_user for CLI mode — the CLI handles auth refresh in
         // ensure_auth_state so it can detect invalid credentials before running
-        // a command.
+        // a command. Local-offline builds have no Warp session to refresh.
         if !matches!(launch_mode, LaunchMode::CommandLine { .. }) {
             AuthManager::handle(ctx).update(ctx, |auth_manager, ctx| {
                 auth_manager.refresh_user(ctx);
@@ -2766,6 +2767,8 @@ pub fn enabled_features() -> HashSet<FeatureFlag> {
         FeatureFlag::SoloUserByok,
         #[cfg(feature = "skip_firebase_anonymous_user")]
         FeatureFlag::SkipFirebaseAnonymousUser,
+        #[cfg(feature = "local_offline")]
+        FeatureFlag::LocalOffline,
         #[cfg(feature = "hoa_onboarding_flow")]
         FeatureFlag::HOAOnboardingFlow,
         #[cfg(feature = "git_operations_in_code_review")]

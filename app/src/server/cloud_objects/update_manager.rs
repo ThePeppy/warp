@@ -633,6 +633,9 @@ impl UpdateManager {
     }
 
     pub fn start_polling_for_updated_objects(&mut self, ctx: &mut ModelContext<Self>) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         let is_online = NetworkStatus::as_ref(ctx).is_online();
 
         if !self.should_poll_for_updated_objects && is_online {
@@ -2877,7 +2880,9 @@ impl UpdateManager {
                 let cloud_model = CloudModel::as_ref(ctx);
                 let object: Option<&CloudWorkflowEnum> = cloud_model.get_object_of_type(enum_id);
                 let Some(object) = object else {
-                    log::error!("Could not find referenced worfklow enum to copy over to the new space, skipping");
+                    log::error!(
+                        "Could not find referenced worfklow enum to copy over to the new space, skipping"
+                    );
                     continue;
                 };
 

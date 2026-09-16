@@ -97,8 +97,7 @@ const CLAIMED_REFERRAL_COUNT_LEFT_MARGIN: f32 = 40.;
 const CLAIMED_REFERRAL_CLIP: usize = 999;
 
 const TERMS_LINK_TEXT: &str = "Certain restrictions apply.";
-const TERMS_URL: &str =
-    "https://docs.warp.dev/support-and-community/community/refer-a-friend#referral-program-terms-and-conditions";
+const TERMS_URL: &str = "https://docs.warp.dev/support-and-community/community/refer-a-friend#referral-program-terms-and-conditions";
 const TERMS_CONTACT_TEXT: &str =
     " If you have any questions about the referral program, please contact referrals@warp.dev.";
 
@@ -411,7 +410,7 @@ impl SettingsPageMeta for ReferralsPageView {
     }
 
     fn should_render(&self, _ctx: &AppContext) -> bool {
-        true
+        !crate::local_offline::is_enabled()
     }
 
     fn on_page_selected(&mut self, _: bool, ctx: &mut ViewContext<Self>) {

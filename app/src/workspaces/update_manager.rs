@@ -131,6 +131,9 @@ impl TeamUpdateManager {
     /// Starts a periodic poll for workspace metadata changes, if there isn't already
     /// an existing poll queued up.
     pub fn start_polling_for_workspace_metadata_updates(&mut self, ctx: &mut ModelContext<Self>) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         let is_online = NetworkStatus::as_ref(ctx).is_online();
         if !self.should_poll_for_workspace_metadata_updates && is_online {
             self.should_poll_for_workspace_metadata_updates = true;
@@ -446,7 +449,9 @@ impl TeamUpdateManager {
                 );
             }
             RequestState::RequestFailed(err) => {
-                log::info!("get_workspaces_metadata_for_user: request failed with error {err:#}. Retries exhausted.");
+                log::info!(
+                    "get_workspaces_metadata_for_user: request failed with error {err:#}. Retries exhausted."
+                );
             }
         }
     }

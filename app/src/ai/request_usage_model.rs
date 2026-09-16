@@ -526,7 +526,7 @@ impl AIRequestUsageModel {
         ctx: &AppContext,
     ) -> BuyCreditsBannerDisplayState {
         // Early return if user dismissed
-        if self.buy_addon_credits_banner_dismissed {
+        if self.buy_addon_credits_banner_dismissed || crate::local_offline::is_enabled() {
             return BuyCreditsBannerDisplayState::Hidden;
         }
         let current_workspace = UserWorkspaces::as_ref(ctx).current_workspace();
