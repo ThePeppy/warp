@@ -1263,7 +1263,9 @@ impl DriveIndex {
                     {
                         self.expand_section_for_object(&id.uid().clone(), ctx);
                     } else {
-                        log::warn!("unknown GenericStringObject type found while trying to manually expand drive section. {object_id:?}");
+                        log::warn!(
+                            "unknown GenericStringObject type found while trying to manually expand drive section. {object_id:?}"
+                        );
                     }
                 }
             };
@@ -5118,7 +5120,7 @@ impl View for DriveIndex {
         .finish();
 
         let index_content = if let (true, Some(personal_object_limit_card)) = (
-            self.should_show_personal_object_limit_status,
+            self.should_show_personal_object_limit_status && !crate::local_offline::is_enabled(),
             self.render_personal_limit_status(appearance, app),
         ) {
             // Render column with a spacer to ensure the tip appears at the bottom of drive
@@ -5162,37 +5164,39 @@ impl View for DriveIndex {
             }
         };
 
-        if let Some(team) = workspaces.current_team() {
-            if team.billing_metadata.is_delinquent_due_to_payment_issue() {
-                let current_user_email = self.auth_state.user_email().unwrap_or_default();
-                let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-                let is_on_stripe_paid_plan = team.billing_metadata.is_on_stripe_paid_plan();
-                drive.add_child(self.render_payment_issue_banner(
-                    appearance,
-                    team.uid,
-                    has_admin_permissions,
-                    is_on_stripe_paid_plan,
-                ));
-            } else if UserWorkspaces::is_at_tier_limit_for_object_type(
-                team.uid,
-                ObjectType::Workflow,
-                app,
-            ) {
-                drive.add_child(self.render_shared_object_limit_hit_banner(
-                    appearance,
+        if !crate::local_offline::is_enabled() {
+            if let Some(team) = workspaces.current_team() {
+                if team.billing_metadata.is_delinquent_due_to_payment_issue() {
+                    let current_user_email = self.auth_state.user_email().unwrap_or_default();
+                    let has_admin_permissions = team.has_admin_permissions(&current_user_email);
+                    let is_on_stripe_paid_plan = team.billing_metadata.is_on_stripe_paid_plan();
+                    drive.add_child(self.render_payment_issue_banner(
+                        appearance,
+                        team.uid,
+                        has_admin_permissions,
+                        is_on_stripe_paid_plan,
+                    ));
+                } else if UserWorkspaces::is_at_tier_limit_for_object_type(
                     team.uid,
                     ObjectType::Workflow,
-                ));
-            } else if UserWorkspaces::is_at_tier_limit_for_object_type(
-                team.uid,
-                ObjectType::Notebook,
-                app,
-            ) {
-                drive.add_child(self.render_shared_object_limit_hit_banner(
-                    appearance,
+                    app,
+                ) {
+                    drive.add_child(self.render_shared_object_limit_hit_banner(
+                        appearance,
+                        team.uid,
+                        ObjectType::Workflow,
+                    ));
+                } else if UserWorkspaces::is_at_tier_limit_for_object_type(
                     team.uid,
                     ObjectType::Notebook,
-                ));
+                    app,
+                ) {
+                    drive.add_child(self.render_shared_object_limit_hit_banner(
+                        appearance,
+                        team.uid,
+                        ObjectType::Notebook,
+                    ));
+                }
             }
         }
 
@@ -5403,7 +5407,9 @@ impl TypedActionView for DriveIndex {
                         log::error!("Creation of EnvVarCollections is not yet supported")
                     }
                     DriveObjectType::AIFact | DriveObjectType::AIFactCollection => {
-                        log::error!("Use DriveIndexAction::OpenAIFactCollection to open the pane view instead");
+                        log::error!(
+                            "Use DriveIndexAction::OpenAIFactCollection to open the pane view instead"
+                        );
                     }
                     DriveObjectType::MCPServer | DriveObjectType::MCPServerCollection => {
                         log::error!(

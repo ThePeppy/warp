@@ -43,6 +43,48 @@ When on, the client:
 
 Do **not** point this build at Warp production auth or invent tokens. That is out of scope and not supported.
 
+## Hardening (round 2)
+
+`local_offline` remains the single switch. When it is on, leftover production clients are redirected, skipped, or no-op’d so a missing Warp server cannot brick the terminal or revive a login wall.
+
+### Disabled when `local_offline` is on
+
+| Area | Behavior |
+|------|----------|
+| Auth / billing GraphQL | `ChannelState` getters return `http://127.0.0.1:0` (and empty Firebase key) |
+| RTC / Drive websocket | `ws://127.0.0.1:0/...`; listener never starts |
+| Oz / cloud agents | `http://127.0.0.1:0`; launch / credit / upgrade modals skipped |
+| Settings sync | Cloud preference retry loop and `sync()` no-op |
+| Telemetry / Rudderstack | Collector does not start; batches are dropped; destinations empty |
+| Sentry / crash reporting | Init skipped; DSN empty |
+| Auto-update / force-update | Polling skipped; releases URL empty; menu items hidden |
+| Account / upgrade UI | Avatar menu, Refer a Friend, invite CTAs, billing banners, credits alerts hidden or no-op |
+
+`ChannelState::new()` also rewrites production channel configs (dev/preview/stable binaries) when `WARP_LOCAL_OFFLINE=1`, so the env override is enough even if you are not running `warp-oss`.
+
+Network failures fail open: GraphQL/HTTP errors against the dead-end do not log you out or show a signup wall. The synthetic local user stays signed in.
+
+Branding (AGPL-safe): About, window title, and the app menu use the label **Warp OSS local**. `LICENSE-AGPL`, copyright notices, and `THIRD_PARTY_LICENSES` are unchanged. This is a modified Warp client, not an official Warp release.
+
+### Remaining network I/O (intentional)
+
+These are **not** Warp production auth/billing/telemetry:
+
+- User-initiated help links (`docs.warp.dev`, privacy policy, Slack community) if you click them
+- Third-party CLI agents you run *inside* the local terminal (Claude Code, Codex, …) using *your* tooling
+- Local filesystem, shells, fonts, and package-manager checks (for example Homebrew) that do not call `app.warp.dev`
+- MCP OAuth you configure yourself (no bundled Warp MCP client secrets in OSS)
+
+If a leftover caller still builds a URL, getters force it to `127.0.0.1:0` rather than `app.warp.dev`.
+
+### Restoring production contact
+
+```bash
+WARP_LOCAL_OFFLINE=0 ./script/run
+```
+
+That turns the flag off: GraphQL/RTC/Oz point at Warp production again, login walls return, and telemetry/Sentry/autoupdate follow the channel config. Do this only if you intend to use official Warp servers.
+
 ## Build a macOS Apple Silicon app without installing Xcode
 
 GitHub-hosted `macos-15` runners have Xcode. You only need a browser.

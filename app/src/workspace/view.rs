@@ -2584,11 +2584,13 @@ impl Workspace {
             me.handle_referral_theme_status_event(event, ctx);
         });
 
-        let referrals_client = ServerApiProvider::as_ref(ctx).get_referrals_client();
-        // On startup, check if the user has earned a referral theme by referring other users
-        referral_theme_status.update(ctx, |model, ctx| {
-            model.query_referral_status(referrals_client, ctx);
-        });
+        if !crate::local_offline::is_enabled() {
+            let referrals_client = ServerApiProvider::as_ref(ctx).get_referrals_client();
+            // On startup, check if the user has earned a referral theme by referring other users
+            referral_theme_status.update(ctx, |model, ctx| {
+                model.query_referral_status(referrals_client, ctx);
+            });
+        }
 
         let bindings_notifier = KeybindingChangedNotifier::handle(ctx);
         ctx.subscribe_to_model(&bindings_notifier, |me, _, event, ctx| {
@@ -8298,48 +8300,50 @@ impl Workspace {
             MenuItem::Separator,
         ]);
 
-        if self.auth_state.is_anonymous_or_logged_out() {
+        if !crate::local_offline::is_enabled() {
+            if self.auth_state.is_anonymous_or_logged_out() {
+                items.push(
+                    MenuItemFields::new("Sign up")
+                        .with_on_select_action(WorkspaceAction::SignupAnonymousUser)
+                        .into_item(),
+                );
+            }
+
+            // Check if the user is on any paid plan to determine whether to show "Billing and Usage" or "Upgrade"
+            let is_on_paid_plan = UserWorkspaces::as_ref(app)
+                .current_workspace()
+                .map(|workspace| workspace.billing_metadata.is_user_on_paid_plan())
+                .unwrap_or(false);
+
+            if is_on_paid_plan {
+                items.push(
+                    MenuItemFields::new("Billing and usage")
+                        .with_on_select_action(WorkspaceAction::ShowSettingsPage(
+                            SettingsSection::BillingAndUsage,
+                        ))
+                        .into_item(),
+                );
+            } else {
+                items.push(
+                    MenuItemFields::new("Upgrade")
+                        .with_on_select_action(WorkspaceAction::ShowUpgrade)
+                        .into_item(),
+                );
+            }
+
             items.push(
-                MenuItemFields::new("Sign up")
-                    .with_on_select_action(WorkspaceAction::SignupAnonymousUser)
+                MenuItemFields::new("Invite a friend")
+                    .with_on_select_action(WorkspaceAction::ShowReferralSettingsPage)
                     .into_item(),
             );
-        }
 
-        // Check if the user is on any paid plan to determine whether to show "Billing and Usage" or "Upgrade"
-        let is_on_paid_plan = UserWorkspaces::as_ref(app)
-            .current_workspace()
-            .map(|workspace| workspace.billing_metadata.is_user_on_paid_plan())
-            .unwrap_or(false);
-
-        if is_on_paid_plan {
-            items.push(
-                MenuItemFields::new("Billing and usage")
-                    .with_on_select_action(WorkspaceAction::ShowSettingsPage(
-                        SettingsSection::BillingAndUsage,
-                    ))
-                    .into_item(),
-            );
-        } else {
-            items.push(
-                MenuItemFields::new("Upgrade")
-                    .with_on_select_action(WorkspaceAction::ShowUpgrade)
-                    .into_item(),
-            );
-        }
-
-        items.push(
-            MenuItemFields::new("Invite a friend")
-                .with_on_select_action(WorkspaceAction::ShowReferralSettingsPage)
-                .into_item(),
-        );
-
-        if !self.auth_state.is_anonymous_or_logged_out() {
-            items.push(
-                MenuItemFields::new("Log out")
-                    .with_on_select_action(WorkspaceAction::LogOut)
-                    .into_item(),
-            );
+            if !self.auth_state.is_anonymous_or_logged_out() {
+                items.push(
+                    MenuItemFields::new("Log out")
+                        .with_on_select_action(WorkspaceAction::LogOut)
+                        .into_item(),
+                );
+            }
         }
         items
     }
@@ -16073,7 +16077,7 @@ impl Workspace {
         variant: CloudAgentCapacityModalVariant,
         ctx: &mut ViewContext<Self>,
     ) {
-        if !FeatureFlag::CloudMode.is_enabled() {
+        if crate::local_offline::is_enabled() || !FeatureFlag::CloudMode.is_enabled() {
             return;
         }
         self.cloud_agent_capacity_modal.update(ctx, |modal, ctx| {
@@ -16118,6 +16122,10 @@ impl Workspace {
     }
 
     pub fn check_and_open_free_tier_limit_modal(&mut self, ctx: &mut ViewContext<Self>) -> bool {
+        if crate::local_offline::is_enabled() {
+            return false;
+        }
+
         let is_free_tier = !UserWorkspaces::as_ref(ctx)
             .current_workspace()
             .is_some_and(|workspace| workspace.billing_metadata.is_user_on_paid_plan());
@@ -16270,6 +16278,9 @@ impl Workspace {
         team_uid: ServerId,
         ctx: &mut ViewContext<Self>,
     ) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         let team = UserWorkspaces::as_ref(ctx).team_from_uid(team_uid);
         if let Some(team) = team {
             let current_user_email = self.auth_state.user_email().unwrap_or_default();
@@ -19986,6 +19997,9 @@ impl TypedActionView for Workspace {
                 source,
             } => self.toggle_palette(*palette_mode, *source, ctx),
             ShowUpgrade => {
+                if crate::local_offline::is_enabled() {
+                    return;
+                }
                 send_telemetry_from_ctx!(TelemetryEvent::UserMenuUpgradeClicked, ctx);
 
                 let auth_state = AuthStateProvider::as_ref(ctx).get();
@@ -20001,6 +20015,9 @@ impl TypedActionView for Workspace {
                 ctx.open_url(&upgrade_url);
             }
             ShowReferralSettingsPage => {
+                if crate::local_offline::is_enabled() {
+                    return;
+                }
                 self.show_settings_with_section(Some(SettingsSection::Referrals), ctx);
             }
             JoinSlack => self.join_slack(ctx),

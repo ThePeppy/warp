@@ -72,7 +72,9 @@ impl ReferralThemeStatus {
         referrals_client: Arc<dyn ReferralsClient>,
         ctx: &mut ModelContext<Self>,
     ) {
-        if !AuthStateProvider::as_ref(ctx).get().is_logged_in() {
+        if crate::local_offline::is_enabled()
+            || !AuthStateProvider::as_ref(ctx).get().is_logged_in()
+        {
             return;
         }
 

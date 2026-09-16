@@ -129,7 +129,8 @@ impl AutoupdateState {
         ctx.add_singleton_model(move |ctx| {
             let state_handle = WindowManager::handle(ctx);
             let mut me = Self::new(server_api);
-            if FeatureFlag::Autoupdate.is_enabled()
+            if !crate::local_offline::is_enabled()
+                && FeatureFlag::Autoupdate.is_enabled()
                 && AppExecutionMode::as_ref(ctx).can_autoupdate()
             {
                 // Initiate the polling loop

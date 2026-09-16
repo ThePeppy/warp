@@ -182,6 +182,10 @@ impl OneTimeModalModel {
             return;
         }
 
+        if crate::local_offline::is_enabled() {
+            return;
+        }
+
         // Existing users should never see the code toolbelt new feature popup.
         CodeSettings::handle(ctx).update(ctx, |settings, ctx| {
             if let Err(e) = settings
@@ -325,6 +329,10 @@ impl OneTimeModalModel {
         &mut self,
         ctx: &mut ModelContext<Self>,
     ) -> bool {
+        if crate::local_offline::is_enabled() {
+            return false;
+        }
+
         use crate::workspaces::user_workspaces::UserWorkspaces;
 
         // Check if already dismissed

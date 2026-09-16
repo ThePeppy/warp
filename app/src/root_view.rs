@@ -122,7 +122,13 @@ use warpui::{FocusContext, NextNewWindowsHasThisWindowsBoundsUponClose};
 #[cfg(target_family = "wasm")]
 use crate::auth::web_handoff::{WebHandoffEvent, WebHandoffView};
 
-const WINDOW_TITLE: &str = "Warp";
+fn window_title() -> &'static str {
+    if crate::local_offline::is_enabled() {
+        crate::local_offline::PRODUCT_LABEL
+    } else {
+        "Warp"
+    }
+}
 
 lazy_static! {
     static ref FALLBACK_WINDOW_SIZE: Vector2F = vec2f(800.0, 600.0);
@@ -699,7 +705,7 @@ pub fn create_transferred_window(
         AddWindowOptions {
             window_style,
             window_bounds,
-            title: Some(WINDOW_TITLE.to_owned()),
+            title: Some(window_title().to_owned()),
             background_blur_radius_pixels: Some(*window_settings.background_blur_radius),
             background_blur_texture: *window_settings.background_blur_texture,
             on_gpu_driver_selected: on_gpu_driver_selected_callback(),

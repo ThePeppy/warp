@@ -309,6 +309,11 @@ impl TelemetryApi {
             return Ok(());
         }
 
+        if crate::local_offline::is_enabled() || !ChannelState::is_telemetry_available() {
+            log::info!("Local-offline / no telemetry config: dropping Rudderstack batch");
+            return Ok(());
+        }
+
         if settings_snapshot.should_disable_telemetry() {
             log::info!("Not sending batched messages because telemetry is disabled.");
             return Ok(());

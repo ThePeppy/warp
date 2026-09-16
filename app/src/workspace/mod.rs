@@ -1491,7 +1491,8 @@ fn add_overflow_menu_items_as_editable_binding(app: &mut AppContext) {
             WorkspaceAction::ShowReferralSettingsPage,
         )
         .with_context_predicate(id!("Workspace"))
-        .with_custom_action(CustomAction::ReferAFriend),
+        .with_custom_action(CustomAction::ReferAFriend)
+        .with_enabled(|| !crate::local_offline::is_enabled()),
         EditableBinding::new(
             "workspace:link_to_slack",
             "Join our Slack community (opens external link)",

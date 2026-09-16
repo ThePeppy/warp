@@ -6,6 +6,8 @@
 use warp_core::features::FeatureFlag;
 use warp_core::local_offline as core;
 
+pub use warp_core::local_offline::PRODUCT_LABEL;
+
 /// Returns whether this process should run as a local-first client.
 ///
 /// Order: `WARP_LOCAL_OFFLINE` env override, then the compile-time feature,
@@ -27,5 +29,11 @@ mod tests {
             return;
         }
         assert_eq!(is_enabled(), cfg!(feature = "local_offline"));
+    }
+
+    #[test]
+    fn product_label_matches_core() {
+        assert_eq!(PRODUCT_LABEL, core::PRODUCT_LABEL);
+        assert_eq!(PRODUCT_LABEL, "Warp OSS local");
     }
 }

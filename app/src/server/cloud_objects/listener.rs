@@ -176,7 +176,7 @@ impl Listener {
         // We need to do a one-time check of cloud objects when starting
         // because the Cloud Model was initialized before this model and we could have populated
         // its object cache with objects from sqlite.
-        if listener.has_non_welcome_cloud_objects(ctx) {
+        if !crate::local_offline::is_enabled() && listener.has_non_welcome_cloud_objects(ctx) {
             listener.start_listener(ctx);
         }
 
@@ -281,6 +281,9 @@ impl Listener {
     }
 
     fn start_listener(&mut self, ctx: &mut ModelContext<Self>) {
+        if crate::local_offline::is_enabled() {
+            return;
+        }
         if !self.should_subscribe_to_updates {
             self.should_subscribe_to_updates = true;
             self.get_warp_drive_updates(ctx);

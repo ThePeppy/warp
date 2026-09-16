@@ -17,6 +17,11 @@ on:
   push:
     branches:
       - master
+      - cursor/local-offline-harden-e724
+      - 'cursor/local-offline-harden-*'
+    paths-ignore:
+      - '**.md'
+      - 'specs/**'
 
 env:
   CARGO_TERM_COLOR: always
